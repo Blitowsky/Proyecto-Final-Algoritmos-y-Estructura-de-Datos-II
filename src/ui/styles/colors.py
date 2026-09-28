@@ -1,0 +1,9 @@
+from PyQt6.QtGui import QColor
+
+COLOR_BACKGROUND = QColor("#1e272c")
+COLOR_EDGE = QColor("#7f8c8d")
+COLOR_NODE_DEFAULT = QColor("#34495e")
+COLOR_NODE_DISPATCH = QColor("#e67e22")
+COLOR_NODE_RACK = QColor("#9b59b6")
+COLOR_NODE_VISITED = QColor("#2ecc71")
+COLOR_PICKER_ACTIVE = QColor("#f1c40f")
