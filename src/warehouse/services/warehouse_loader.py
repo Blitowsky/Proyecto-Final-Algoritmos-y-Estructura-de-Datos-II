@@ -32,7 +32,7 @@ def build_warehouse(config: dict) -> WareHouse:
     racks = place_racks(config, width, height, m)
     vertices, edges, halls = build_halls(width, height, m, racks)
 
-    graph = WeightedDirectedGraph(vertices, edges)
+    graph = WeightedDirectedGraph(vertices, edges, m = m)
 
     zones = add_dispatch_zones(config, width, height, racks, halls)
     products = load_products(config, width, height, racks)
@@ -143,7 +143,7 @@ def add_dispatch_zones(
 
 def load_products(config: dict, width: int, height: int, racks: Dictionary) -> Dictionary:
     product_list = config.get("products", [])
-    products = Dictionary(2 * len(product_list) + 1)
+    products = Dictionary(len(product_list))
 
     for p in product_list:
         pid = p["id"]

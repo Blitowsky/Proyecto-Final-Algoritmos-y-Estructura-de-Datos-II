@@ -5,9 +5,10 @@ from warehouse.structures.dictionary import *
 from warehouse.structures.myqueue import *
 
 class Graph:
-    def __init__(self, v: lk.LinkedList, e: lk.LinkedList) -> None:
+    def __init__(self, v: lk.LinkedList, e: lk.LinkedList, m: int|None = None) -> None:
         self.v = v
         self.e = e
+        self.m = m
         self.graph = self.createGraph()
 
     # Ejercicio 1
@@ -15,7 +16,8 @@ class Graph:
         v = self.v
         e = self.e
 
-        graph = Dictionary(lk.length(v))
+        len_v = self.m if self.m is not None else lk.length(v)
+        graph = Dictionary(len_v)
         self._insert_vertices(graph)
 
         curr_e = e.head
@@ -76,16 +78,18 @@ class WeightedGraph(Graph):
         return graph
 
 class WeightedDirectedGraph(Graph):
-    def __init__(self, v: lk.LinkedList, e: lk.LinkedList) -> None:
+    def __init__(self, v: lk.LinkedList, e: lk.LinkedList, m: int|None = None) -> None:
         self.v = v
         self.e = e
+        self.m = m
         self.graph = self.createWeightedDirectedGraph()
  
     def createWeightedDirectedGraph(self) -> Dictionary:
         v = self.v
         e = self.e
  
-        graph = Dictionary(lk.length(v))
+        len_v = self.m if self.m is not None else lk.length(v)
+        graph = Dictionary(len_v)
         self._insert_vertices(graph)
  
         curr_e = e.head

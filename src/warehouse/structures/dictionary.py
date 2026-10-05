@@ -12,6 +12,17 @@ class Dictionary:
             return int(s) if s.isdigit() else sum(ord(ch) for ch in s)
         return to_key(value) % self.m
 
+    def printDict(self) -> None:
+        d = self.dictionary
+        for i, curr in enumerate(d):
+            print(f"[{i}]", end=" ")
+            current = curr.head
+            while current is not None:
+                entry = current.value
+                print(entry, end=" -> ")
+                current = current.nextNode
+            print("None")
+
 # Ejercicio 2
 def insert(D: Dictionary, value, key = None) -> Dictionary:
     key = key if key is not None else value
