@@ -6,6 +6,7 @@ from warehouse.domain.warehouse import WareHouse
 from warehouse.domain.location import DispatchZone, HallNode, RackAccess
 from warehouse.domain.rack import Rack
 from warehouse.domain.product import Product
+from warehouse.domain.picker import Picker
 
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
@@ -19,10 +20,15 @@ def reachable_halves(dx: int, dy: int) -> tuple[bool, bool]:
         return False, True
     return True, True
 
-def require_int(value, label):
+def require_int(value, label: str):
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(label + " debe ser un entero.")
     return value
+
+def require_keys(section: list, keys: tuple, label: str) -> None:
+    for key in keys:
+        if key not in section:
+            raise ValueError(f"{label} le falta '{key}'")
 
 def build_warehouse(config: dict) -> WareHouse:
     width = config["width"]
@@ -36,6 +42,7 @@ def build_warehouse(config: dict) -> WareHouse:
 
     zones = add_dispatch_zones(config, width, height, racks, halls)
     products = load_products(config, width, height, racks)
+    pickers = add_pickers(config, width, height, halls)
     
     return WareHouse(
         width, 
@@ -44,7 +51,8 @@ def build_warehouse(config: dict) -> WareHouse:
         halls, 
         racks,
         zones,
-        products
+        products,
+        pickers
     )
 
 def place_racks(config: dict, width: int, height: int, m: int) -> Dictionary:
@@ -193,8 +201,41 @@ def load_products(config: dict, width: int, height: int, racks: Dictionary) -> D
 
     return products
 
-    
+def add_pickers(config: dict, width: int, height: int, halls: Dictionary) -> LinkedList:
+    pickers = LinkedList()
+    picker_list = config.get("pickers", [])
 
+    for i in range(len(picker_list)):
+        p = picker_list[i]
+        pid = p.get("id", "W" + str(i + 1))
+        label = f"picker {pid}"
+
+        other = pickers.head
+        while other is not None:
+            if other.value and other.value.id == pid:
+                raise ValueError(f"El {label} está repetido.")
+            other = other.nextNode
+
+        require_keys(p, ("start", "capacity"), f"Al {label}")
+
+        capacity = p["capacity"]
+        if isinstance(capacity, bool) or not isinstance(capacity, (int, float)) or capacity <= 0:
+            raise ValueError(f"El {label} necesita una capacidad positiva.")
+
+        require_keys(p["start"], ("x", "y"), f"Al nodo comienzo del {label}")
+        x = require_int(p["start"]["x"], f"La componente x del nodo comienzo del {label}")
+        y = require_int(p["start"]["y"], f"La componente y del nodo comienzo del {label}")
+        if not (0 <= x < width and 0 <= y < height):
+            raise ValueError(f"El {label} empieza fuera del warehouse.")
+
+        start = cell_id(x, y, width)
+        if search(halls, start) is None:
+            raise ValueError(f"El {label} comienza en un pasillo inválido.")
+
+        add(pickers, Picker(pid, start, capacity))
+
+    return pickers
+        
 
         
 

@@ -12,7 +12,8 @@ class WareHouse:
         halls: Dictionary, 
         racks: Dictionary, 
         zones: LinkedList,
-        products: Dictionary
+        products: Dictionary,
+        pickers: LinkedList
     ) -> None:
         self.width: int = width
         self.height: int = height
@@ -21,3 +22,4 @@ class WareHouse:
         self.racks: Dictionary = racks
         self.zones: LinkedList = zones
         self.products: Dictionary = products
+        self.pickers: LinkedList = pickers
