@@ -1,10 +1,14 @@
 from warehouse.structures.linkedlist import LinkedList
 from warehouse.structures.dictionary import Dictionary
 from warehouse.structures.graph import WeightedDirectedGraph
-
 from warehouse.domain.rack import Rack
 
+
+
 class WareHouse:
+
+    
+
     def __init__(
         self, width: int, 
         height: int, 
@@ -23,3 +27,5 @@ class WareHouse:
         self.zones: LinkedList = zones
         self.products: Dictionary = products
         self.pickers: LinkedList = pickers
+
+    

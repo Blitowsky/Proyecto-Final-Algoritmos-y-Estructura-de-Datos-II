@@ -1,9 +1,22 @@
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
+from warehouse.services.warehouse_loader import save
+from warehouse.services.warehouse_loader import load
 
-config = load_config("/home/mati/Desktop/Proyecto-Final-Algoritmos-y-Estructura-de-Datos-II/src/tests/init2.json")
+from pathlib import Path
 
-warehouse = build_warehouse(config)
+
+actal_path = Path.cwd()
+final_path= actal_path / "tests" / "init2.json"
+
+
+warehouse = load()
+
+if warehouse is None:
+    config = load_config(final_path)
+    warehouse = build_warehouse(config)
+    save(warehouse)
+
 
 warehouse.graph.printGraph()
 print("==========")

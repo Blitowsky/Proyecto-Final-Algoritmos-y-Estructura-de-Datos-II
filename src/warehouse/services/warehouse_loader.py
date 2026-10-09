@@ -8,6 +8,9 @@ from warehouse.domain.rack import Rack
 from warehouse.domain.product import Product
 from warehouse.domain.picker import Picker
 
+import pickle
+
+WAREHOUSE_PATH = "./warehouse.pkl"
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 def cell_id(x: int, y: int, width: int) -> int:
@@ -236,6 +239,23 @@ def add_pickers(config: dict, width: int, height: int, halls: Dictionary) -> Lin
 
     return pickers
         
+def save(self):
+        with open(WAREHOUSE_PATH, "bw") as file:
+            pickle.dump(self, file)
 
+        print("WareHouse creado satisfactoriamente")
+
+def load():
+    try: 
+        with open(WAREHOUSE_PATH, "br") as file:
+            return pickle.load(file)
+    except FileNotFoundError:
+        print(f"No se encontró el WareHouse en \"{WAREHOUSE_PATH}\"")
+    except pickle.UnpicklingError:
+        print(f"Error deserializando el WareHouses \"{WAREHOUSE_PATH}\"")
+    except Exception as error:
+        print(f"Ocurrió un error inesperado: {error}")
+    return None
+    
         
 
