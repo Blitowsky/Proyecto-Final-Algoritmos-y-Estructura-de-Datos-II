@@ -9,7 +9,12 @@ class Dictionary:
     def hash_func(self, value) -> int:
         def to_key(value) -> int:
             s = str(value)
-            return int(s) if s.isdigit() else sum(ord(ch) for ch in s)
+            if s.isdigit():
+                return value
+            hash_value = 5381
+            for char in s:
+                hash_value = (hash_value * 33) + ord(char)
+            return hash_value
         return to_key(value) % self.m
 
     def printDict(self) -> None:
