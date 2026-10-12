@@ -7,7 +7,7 @@ from warehouse.domain.location import DispatchZone, HallNode, RackAccess
 from warehouse.domain.rack import Rack
 from warehouse.domain.product import Product
 from warehouse.domain.picker import Picker
-from warehouse.domain.wave import Order
+from warehouse.domain.wave import Order, Wave, WaveConfig
 
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
@@ -45,6 +45,10 @@ def build_warehouse(config: dict) -> WareHouse:
     products = load_products(config, width, height, racks)
     pickers = add_pickers(config, width, height, halls)
     
+    orders, orders_by_id = add_orders(config, products)
+    wave_config = add_wave_config(config)
+    waves = add_waves(config, orders_by_id, wave_config)
+
     return WareHouse(
         width, 
         height, 
@@ -53,7 +57,11 @@ def build_warehouse(config: dict) -> WareHouse:
         racks,
         zones,
         products,
-        pickers
+        pickers,
+        orders,
+        orders_by_id,
+        wave_config,
+        waves
     )
 
 def place_racks(config: dict, width: int, height: int, m: int) -> Dictionary:
@@ -245,7 +253,7 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
     for i in range(len(order_list)):
         o = order_list[i]
         label = f"pedido #{i + 1}"
-        require_keys(o, ("id", "priority", "lines"), label)
+        require_keys(o, ("id", "priority", "lines"), f"Al {label}")
         oid = o["id"]
         label = f"pedido {oid}"
 
@@ -255,6 +263,51 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
             raise ValueError(f"El {label} no tiene productos.")
 
         order = Order(oid, o["priority"])
+        for line in o["lines"]:
+            require_keys(line, ("product", "qty"), f"A la linea del {label}")
+            pid = line["product"]
+            if search(products, pid) is None:
+                raise ValueError(f"El {label} pide un producto inexistente: {pid}")
+            order.add_line(search(products, pid), line["qty"])
 
-        
+        add(orders, order)
+        insert(by_id, order, oid)
+
+    return orders, by_id
+
+def add_wave_config(config: dict) -> WaveConfig|None:
+    if "wave_config" not in config:
+        return None
+    wc = config["wave_config"]
+    require_keys(wc, ("max_orders", "max_products"), "A la configuración de las waves")
+    return WaveConfig(wc["max_orders"], wc["max_products"])
+
+def add_waves(config: dict, orders_by_id: Dictionary, wave_config: WaveConfig|None) -> LinkedList:
+    waves = LinkedList()
+    wave_list = config.get("waves", [])
+    if len(wave_list) > 0 and wave_config is None:
+        raise ValueError("La sección de 'waves' necesita una sección 'wave_config'.")
+
+    for i in range(len(wave_list)):
+        w = wave_list[i]
+        require_keys(w, ("id", "orders"), f"A la wave #{i + 1}")
+        wid = w["id"]
+        label = f"wave {wid}"
+
+        other = waves.head
+        while other is not None:
+            if other.value and other.value.id == wid:
+                raise ValueError(f"La {label} aparece dos veces.")
+            other = other.nextNode
+        if len(w["orders"]) == 0:
+            raise ValueError(f"La {label} no tiene pedidos.")
+
+        wave = Wave(wid, wave_config)
+        for oid in w["orders"]:
+            if search(orders_by_id, oid) is None:
+                raise ValueError(f"La {label} tiene un pedido {oid} inexistente.")
+            wave.add_order(search(orders_by_id, oid))
+        add(waves, wave)
+
+    return waves
 

@@ -17,7 +17,7 @@ class WareHouse:
         pickers: LinkedList,
         orders: LinkedList,
         orders_by_id: Dictionary,
-        wave_config: WaveConfig,
+        wave_config: WaveConfig|None,
         waves: LinkedList
     ) -> None:
         self.width: int = width
@@ -30,5 +30,5 @@ class WareHouse:
         self.pickers: LinkedList = pickers
         self.orders: LinkedList = orders
         self.orders_by_id: Dictionary = orders_by_id
-        self.wave_config: WaveConfig = wave_config
+        self.wave_config: WaveConfig|None = wave_config
         self.waves: LinkedList = waves
