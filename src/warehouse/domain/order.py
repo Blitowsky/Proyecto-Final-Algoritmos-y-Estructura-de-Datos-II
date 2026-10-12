@@ -1,7 +1,6 @@
 from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.product import Product
-from warehouse.domain.wave import Wave
 
 class OrderLine:
     def __init__(self, product: Product, qty: int) -> None:
@@ -26,7 +25,7 @@ class Order:
         self.total_units: int = 0
         self.total_weight: float = 0.0
         self.state: str = "PENDIENTE"
-        self.wave: Wave|None = None
+        self.wave = None
 
     def add_line(self, product: Product, qty: int) -> None:
         if self.state != "PENDIENTE":
@@ -53,7 +52,7 @@ class Order:
             raise ValueError(f"El pedido {self.id} está {self.state}, debe ser {expected} antes de poder ser {new}.")
         self.state = new
 
-    def assign_to(self, wave: Wave) -> None:
+    def assign_to(self, wave) -> None:
         self._move("PENDIENTE", "EN_WAVE")
         self.wave = wave
 

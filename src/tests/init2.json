@@ -4,6 +4,33 @@
   "dispatch_zones": [
     {"id": "D1", "p1": {"x": 0, "y": 3}, "p2": {"x": 0, "y": 1}}
   ],
+  "products": [
+    {
+        "id": "P001",
+        "name": "Monitor 27",
+        "location": {"x": 1, "y": 1, "z": 1, "side": "L"},
+        "stock": 20,
+        "weight": 6.5
+    },
+    {
+        "id": "P002",
+        "name": "Teclado Mecánico",
+        "location": {"x": 1, "y": 3, "z": 1, "side": "R"},
+        "stock": 15,
+        "weight": 1.2
+    }
+  ],
+  "pickers": [
+    {"id": "W1", "zone": "D1", "capacity": 25.0, "start": {"x": 0, "y": 0}}
+  ],
+  "orders": [
+    {"id": "O1", "priority": 3, "lines": [{"product": "P001", "qty": 2}]},
+    {"id": "O2", "priority": 2, "lines": [{"product": "P002", "qty": 1}]}
+  ],
+  "wave_config": {"max_orders": 3, "max_products": 6},
+  "waves": [
+    {"id": "WV1", "orders": ["O1", "O2"]}
+  ],
   "racks": [
     {"id": "R1", "x": 1, "y": 1},
     {"id": "R2", "x": 1, "y": 3}
