@@ -7,6 +7,7 @@ from warehouse.domain.location import DispatchZone, HallNode, RackAccess
 from warehouse.domain.rack import Rack
 from warehouse.domain.product import Product
 from warehouse.domain.picker import Picker
+from warehouse.domain.wave import Order
 
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
@@ -151,7 +152,7 @@ def add_dispatch_zones(
 
 def load_products(config: dict, width: int, height: int, racks: Dictionary) -> Dictionary:
     product_list = config.get("products", [])
-    products = Dictionary(len(product_list))
+    products = Dictionary(2 * len(product_list) + 1)
 
     for p in product_list:
         pid = p["id"]
@@ -236,6 +237,24 @@ def add_pickers(config: dict, width: int, height: int, halls: Dictionary) -> Lin
 
     return pickers
         
+def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictionary]:
+    order_list = config.get("orders", [])
+    orders = LinkedList()
+    by_id = Dictionary(2 * len(order_list) + 1)
+
+    for i in range(len(order_list)):
+        o = order_list[i]
+        label = f"pedido #{i + 1}"
+        require_keys(o, ("id", "priority", "lines"), label)
+        oid = o["id"]
+        label = f"pedido {oid}"
+
+        if search(by_id, oid) is not None:
+            raise ValueError(f"El {label} aparece dos veces.")
+        if len(o["lines"]) == 0:
+            raise ValueError(f"El {label} no tiene productos.")
+
+        order = Order(oid, o["priority"])
 
         
 
