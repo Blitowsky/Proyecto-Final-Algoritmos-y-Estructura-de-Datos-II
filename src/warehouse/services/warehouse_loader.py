@@ -6,6 +6,8 @@ from warehouse.domain.warehouse import WareHouse
 from warehouse.domain.location import DispatchZone, HallNode, RackAccess
 from warehouse.domain.rack import Rack
 from warehouse.domain.product import Product
+from warehouse.domain.picker import Picker
+from warehouse.domain.wave import Order, Wave, WaveConfig
 
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
@@ -19,10 +21,15 @@ def reachable_halves(dx: int, dy: int) -> tuple[bool, bool]:
         return False, True
     return True, True
 
-def require_int(value, label):
+def require_int(value, label: str):
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(label + " debe ser un entero.")
     return value
+
+def require_keys(section: list, keys: tuple, label: str) -> None:
+    for key in keys:
+        if key not in section:
+            raise ValueError(f"{label} le falta '{key}'")
 
 def build_warehouse(config: dict) -> WareHouse:
     width = config["width"]
@@ -36,7 +43,12 @@ def build_warehouse(config: dict) -> WareHouse:
 
     zones = add_dispatch_zones(config, width, height, racks, halls)
     products = load_products(config, width, height, racks)
+    pickers = add_pickers(config, width, height, halls)
     
+    orders, orders_by_id = add_orders(config, products)
+    wave_config = add_wave_config(config)
+    waves = add_waves(config, orders_by_id, wave_config)
+
     return WareHouse(
         width, 
         height, 
@@ -44,7 +56,12 @@ def build_warehouse(config: dict) -> WareHouse:
         halls, 
         racks,
         zones,
-        products
+        products,
+        pickers,
+        orders,
+        orders_by_id,
+        wave_config,
+        waves
     )
 
 def place_racks(config: dict, width: int, height: int, m: int) -> Dictionary:
@@ -143,7 +160,7 @@ def add_dispatch_zones(
 
 def load_products(config: dict, width: int, height: int, racks: Dictionary) -> Dictionary:
     product_list = config.get("products", [])
-    products = Dictionary(len(product_list))
+    products = Dictionary(2 * len(product_list) + 1)
 
     for p in product_list:
         pid = p["id"]
@@ -193,8 +210,104 @@ def load_products(config: dict, width: int, height: int, racks: Dictionary) -> D
 
     return products
 
-    
+def add_pickers(config: dict, width: int, height: int, halls: Dictionary) -> LinkedList:
+    pickers = LinkedList()
+    picker_list = config.get("pickers", [])
 
+    for i in range(len(picker_list)):
+        p = picker_list[i]
+        pid = p.get("id", "W" + str(i + 1))
+        label = f"picker {pid}"
 
+        other = pickers.head
+        while other is not None:
+            if other.value and other.value.id == pid:
+                raise ValueError(f"El {label} está repetido.")
+            other = other.nextNode
+
+        require_keys(p, ("start", "capacity"), f"Al {label}")
+
+        capacity = p["capacity"]
+        if isinstance(capacity, bool) or not isinstance(capacity, (int, float)) or capacity <= 0:
+            raise ValueError(f"El {label} necesita una capacidad positiva.")
+
+        require_keys(p["start"], ("x", "y"), f"Al nodo comienzo del {label}")
+        x = require_int(p["start"]["x"], f"La componente x del nodo comienzo del {label}")
+        y = require_int(p["start"]["y"], f"La componente y del nodo comienzo del {label}")
+        if not (0 <= x < width and 0 <= y < height):
+            raise ValueError(f"El {label} empieza fuera del warehouse.")
+
+        start = cell_id(x, y, width)
+        if search(halls, start) is None:
+            raise ValueError(f"El {label} comienza en un pasillo inválido.")
+
+        add(pickers, Picker(pid, start, capacity))
+
+    return pickers
         
+def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictionary]:
+    order_list = config.get("orders", [])
+    orders = LinkedList()
+    by_id = Dictionary(2 * len(order_list) + 1)
+
+    for i in range(len(order_list)):
+        o = order_list[i]
+        label = f"pedido #{i + 1}"
+        require_keys(o, ("id", "priority", "lines"), f"Al {label}")
+        oid = o["id"]
+        label = f"pedido {oid}"
+
+        if search(by_id, oid) is not None:
+            raise ValueError(f"El {label} aparece dos veces.")
+        if len(o["lines"]) == 0:
+            raise ValueError(f"El {label} no tiene productos.")
+
+        order = Order(oid, o["priority"])
+        for line in o["lines"]:
+            require_keys(line, ("product", "qty"), f"A la linea del {label}")
+            pid = line["product"]
+            if search(products, pid) is None:
+                raise ValueError(f"El {label} pide un producto inexistente: {pid}")
+            order.add_line(search(products, pid), line["qty"])
+
+        add(orders, order)
+        insert(by_id, order, oid)
+
+    return orders, by_id
+
+def add_wave_config(config: dict) -> WaveConfig|None:
+    if "wave_config" not in config:
+        return None
+    wc = config["wave_config"]
+    require_keys(wc, ("max_orders", "max_products"), "A la configuración de las waves")
+    return WaveConfig(wc["max_orders"], wc["max_products"])
+
+def add_waves(config: dict, orders_by_id: Dictionary, wave_config: WaveConfig|None) -> LinkedList:
+    waves = LinkedList()
+    wave_list = config.get("waves", [])
+    if len(wave_list) > 0 and wave_config is None:
+        raise ValueError("La sección de 'waves' necesita una sección 'wave_config'.")
+
+    for i in range(len(wave_list)):
+        w = wave_list[i]
+        require_keys(w, ("id", "orders"), f"A la wave #{i + 1}")
+        wid = w["id"]
+        label = f"wave {wid}"
+
+        other = waves.head
+        while other is not None:
+            if other.value and other.value.id == wid:
+                raise ValueError(f"La {label} aparece dos veces.")
+            other = other.nextNode
+        if len(w["orders"]) == 0:
+            raise ValueError(f"La {label} no tiene pedidos.")
+
+        wave = Wave(wid, wave_config)
+        for oid in w["orders"]:
+            if search(orders_by_id, oid) is None:
+                raise ValueError(f"La {label} tiene un pedido {oid} inexistente.")
+            wave.add_order(search(orders_by_id, oid))
+        add(waves, wave)
+
+    return waves
 
