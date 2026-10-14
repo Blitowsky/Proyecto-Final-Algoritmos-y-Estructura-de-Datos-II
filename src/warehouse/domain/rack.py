@@ -1,5 +1,7 @@
 from warehouse.structures.linkedlist import LinkedList
 
+from warehouse.domain.rect import Rect
+
 class RackHalf:
     def __init__(self, rack_id: int, side: str) -> None:
         self.rack_id: int = rack_id
@@ -8,10 +10,7 @@ class RackHalf:
         self.access_halls: LinkedList = LinkedList()
 
 class Rack:
-    def __init__(self, rack_id: int, x: int, y: int) -> None:
-        self.id: int = rack_id
-        self.x: int = x
-        self.y: int = y
-        self.left: RackHalf = RackHalf(rack_id, "L")
-        self.right: RackHalf = RackHalf(rack_id, "R")
+    def __init__(self, rack_id: str, rect: Rect) -> None:
+        self.id: str = rack_id
+        self.rect: Rect = rect
 
