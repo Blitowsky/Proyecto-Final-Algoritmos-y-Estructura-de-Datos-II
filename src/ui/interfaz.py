@@ -5,7 +5,9 @@ from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
 
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
-from warehouse.structures.dictionary import search
+
+#Tipos de celdas que puede tener el warehouse
+from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 
 
 class Ventana(QWidget):
@@ -19,8 +21,7 @@ class Ventana(QWidget):
         #Espacio que dejo alrededor del warehouse
         self.margen = 30
 
-        #La escala se calcula dependiendo del tamaño de la ventana
-        #Comienza con un valor inicial 1
+        #Valor inicial, despues se calcula dependiendo del tamaño de la ventana
         self.escala = 1
 
 
@@ -30,21 +31,20 @@ class Ventana(QWidget):
         ancho_disponible = self.width() - 2 * self.margen
         alto_disponible = self.height() - 2 * self.margen
 
-        #Calculo cuanto puede medir cada celda para que entre por ancho y por alto
+        #Calculo cuanto puede medir cada celda
         escala_x = ancho_disponible // self.warehouse.width
         escala_y = alto_disponible // self.warehouse.height
 
-        #Uso la escala mas chica para asegurarme de que entre todo el warehouse
+        #Uso la escala mas chica para asegurarme de que entre todo
         return max(1, min(escala_x, escala_y))
 
 
     def coordenada_a_pixel(self, x, y):
 
-        #La coordenada x crece normalmente hacia la derecha
+        #La coordenada x crece hacia la derecha
         xp = self.margen + x * self.escala
 
-        #Invierto y porque en el warehouse el (0,0) esta abajo a la izquierda,
-        #pero en PyQt esta arriba a la izquierda
+        #Invierto y porque PyQt comienza arriba a la izquierda
         yp = self.margen + (self.warehouse.height - 1 - y) * self.escala
 
         return xp, yp
@@ -54,7 +54,7 @@ class Ventana(QWidget):
 
         painter = QPainter(self)
 
-        #Cada vez que se dibuja la ventana vuelvo a calcular la escala
+        #Calculo nuevamente la escala cada vez que se dibuja la ventana
         self.escala = self.calcular_escala()
 
 
@@ -63,114 +63,121 @@ class Ventana(QWidget):
         # ==================================================
 
         #Dibujo el borde del warehouse
+        painter.setPen(QPen(QColor("black"), 2))
+        painter.setBrush(QBrush())
+
         painter.drawRect(self.margen, self.margen, self.warehouse.width * self.escala, self.warehouse.height * self.escala)
 
 
         # ==================================================
-        # RACKS Y ZONAS DE DESPACHO
+        # CELDAS DEL FLOOR
         # ==================================================
 
-        #Recorro todas las celdas del warehouse
+        #Recorro toda la cuadricula del warehouse
         for y in range(self.warehouse.height):
 
             for x in range(self.warehouse.width):
 
-                #Obtengo el id de la celda
-                cid = y * self.warehouse.width + x
+                #Obtengo la celda que esta en (x,y)
+                cell = self.warehouse.floor.cell_at(x, y)
 
-                #Busco si en esta celda hay un rack
-                rack = search(self.warehouse.racks, cid)
+                if cell is None:
+                    continue
 
-                #Busco si en esta celda hay un hall
-                hall = search(self.warehouse.halls, cid)
-
-                #Paso las coordenadas del warehouse a coordenadas de la pantalla
+                #Paso las coordenadas del warehouse a coordenadas de pantalla
                 xp, yp = self.coordenada_a_pixel(x, y)
 
 
-                #Si hay un rack en esta celda lo dibujo
-                if rack is not None:
+                #Si es una celda de rack
+                if cell.kind == RACK:
 
                     painter.setBrush(QBrush(QColor("gray")))
 
-                    painter.drawRect(xp + 5, yp + 5, self.escala - 10, self.escala - 10)
+                    painter.drawRect(xp + 3, yp + 3, self.escala - 6, self.escala - 6)
 
-                    painter.drawText(xp + 10, yp + 25, str(rack.id))
+                    #Muestro el nombre del rack solo una vez
+                    rack = cell.owner
+
+                    if x == rack.rect.x and y == rack.rect.y:
+                        painter.drawText(xp + 5, yp + 20, str(rack.id))
 
 
-                #Si el hall pertenece a una zona de despacho la dibujo
-                elif hall is not None and hall.zone is not None:
+                #Si es una zona de despacho
+                elif cell.kind == ZONE:
 
                     painter.setBrush(QBrush(QColor("lightgreen")))
 
-                    painter.drawRect(xp + 5, yp + 5, self.escala - 10, self.escala - 10)
+                    painter.drawRect(xp + 3, yp + 3, self.escala - 6, self.escala - 6)
+
+
+                #Si es una puerta
+                elif cell.kind == DOOR:
+
+                    painter.setBrush(QBrush(QColor("red")))
+
+                    painter.drawRect(xp + 3, yp + 3, self.escala - 6, self.escala - 6)
 
 
         # ==================================================
-        # ARISTAS
+        # ARISTAS DEL GRAFO
         # ==================================================
 
         painter.setPen(QPen(QColor("black"), 2))
 
-        #Empiezo desde la primera arista del grafo
+        #Empiezo desde la primera arista
         actual = self.warehouse.graph.e.head
 
         while actual is not None:
 
-            #Cada arista tiene origen, destino y peso
+            #Cada arista tiene nodo origen, nodo destino y peso
             origen_id, destino_id, peso = actual.value
 
-            #Busco los HallNodes correspondientes al origen y destino
-            hall_origen = search(self.warehouse.halls, origen_id)
-            hall_destino = search(self.warehouse.halls, destino_id)
+            #Paso el id de cada nodo a coordenadas (x,y)
+            origen_x, origen_y = self.warehouse.node_xy(origen_id)
+            destino_x, destino_y = self.warehouse.node_xy(destino_id)
 
-            if hall_origen is not None and hall_destino is not None:
+            #Paso las coordenadas del warehouse a la pantalla
+            x1, y1 = self.coordenada_a_pixel(origen_x, origen_y)
+            x2, y2 = self.coordenada_a_pixel(destino_x, destino_y)
 
-                #Obtengo la esquina superior izquierda de cada celda
-                x1, y1 = self.coordenada_a_pixel(hall_origen.x, hall_origen.y)
-                x2, y2 = self.coordenada_a_pixel(hall_destino.x, hall_destino.y)
+            #Busco el centro de las dos celdas
+            x1 += self.escala // 2
+            y1 += self.escala // 2
 
-                #Me muevo hasta el centro de cada celda
-                x1 += self.escala // 2
-                y1 += self.escala // 2
+            x2 += self.escala // 2
+            y2 += self.escala // 2
 
-                x2 += self.escala // 2
-                y2 += self.escala // 2
-
-                #Dibujo la arista entre los dos HallNodes
-                painter.drawLine(x1, y1, x2, y2)
+            #Dibujo la arista
+            painter.drawLine(x1, y1, x2, y2)
 
             #Paso a la siguiente arista
             actual = actual.nextNode
 
 
         # ==================================================
-        # HALL NODES
+        # CELDAS DE PASILLO
         # ==================================================
 
         painter.setBrush(QBrush(QColor("black")))
 
-        #Recorro nuevamente todas las celdas
+        #Recorro nuevamente toda la cuadricula
         for y in range(self.warehouse.height):
 
             for x in range(self.warehouse.width):
 
-                cid = y * self.warehouse.width + x
+                cell = self.warehouse.floor.cell_at(x, y)
 
-                #Busco si existe un HallNode en esta celda
-                hall = search(self.warehouse.halls, cid)
+                #Solo dibujo los nodos que sean pasillos
+                if cell is not None and cell.kind == HALL:
 
-                if hall is not None:
-
-                    #Obtengo la esquina de la celda
-                    xp, yp = self.coordenada_a_pixel(hall.x, hall.y)
+                    xp, yp = self.coordenada_a_pixel(x, y)
 
                     #Busco el centro de la celda
                     xp += self.escala // 2
                     yp += self.escala // 2
 
-                    #Dibujo el HallNode
-                    painter.drawEllipse(xp - 4, yp - 4, 8, 8)
+                    #Dibujo el nodo del pasillo
+                    painter.drawEllipse(xp - 3, yp - 3, 6, 6)
 
 
         # ==================================================
@@ -191,13 +198,12 @@ class Ventana(QWidget):
                     #El producto esta guardado en la segunda posicion de la tupla
                     producto = actual_producto.value[1]
 
-                    #Busco la celda donde esta guardado el producto
+                    #Product.x y Product.y obtienen la posicion de su RackCell
                     xp, yp = self.coordenada_a_pixel(producto.x, producto.y)
 
-                    #Dibujo un cuadrado naranja para indicar que hay un producto
-                    painter.drawRect(xp + self.escala - 17, yp + 7, 10, 10)
+                    #Dibujo un cuadrado naranja para indicar que hay producto
+                    painter.drawRect(xp + self.escala - 12, yp + 4, 8, 8)
 
-                #Paso al siguiente producto
                 actual_producto = actual_producto.nextNode
 
 
@@ -214,42 +220,40 @@ class Ventana(QWidget):
 
             if picker is not None:
 
-                #picker.node tiene el id del HallNode donde esta parado el picker
-                hall_picker = search(self.warehouse.halls, picker.node)
+                #picker.node guarda el id del nodo donde esta parado
+                #node_xy convierte ese id nuevamente a coordenadas x,y
+                x, y = self.warehouse.node_xy(picker.node)
 
-                if hall_picker is not None:
+                #Paso esas coordenadas a la pantalla
+                xp, yp = self.coordenada_a_pixel(x, y)
 
-                    #Busco la celda donde esta parado
-                    xp, yp = self.coordenada_a_pixel(hall_picker.x, hall_picker.y)
+                #Busco el centro de la celda
+                xp += self.escala // 2
+                yp += self.escala // 2
 
-                    #Busco el centro de la celda
-                    xp += self.escala // 2
-                    yp += self.escala // 2
+                painter.setBrush(QBrush(QColor("blue")))
 
-                    painter.setBrush(QBrush(QColor("blue")))
+                #Dibujo el picker
+                painter.drawEllipse(xp - 10, yp - 10, 20, 20)
 
-                    #Dibujo el picker
-                    painter.drawEllipse(xp - 10, yp - 10, 20, 20)
+                #Muestro su id
+                painter.drawText(xp - 20, yp - 15, str(picker.id))
 
-                    #Muestro el id del picker
-                    painter.drawText(xp - 20, yp - 15, str(picker.id))
-
-            #Paso al siguiente picker
             actual_picker = actual_picker.nextNode
 
 
 app = QApplication(sys.argv)
 
-#Cargo el archivo JSON que quiero probar
-config = load_config("src/tests/prueba.json")
+#Cargo directamente el escenario oficial
+config = load_config("src/data/escenario_basico.json")
 
-#Construyo el warehouse a partir del JSON
+#Construyo el warehouse
 warehouse = build_warehouse(config)
 
-#Creo la ventana y le paso el warehouse
+#Creo la ventana
 ventana = Ventana(warehouse)
 
-#Abro la ventana maximizada para aprovechar el tamaño de la pantalla
+#La abro maximizada
 ventana.showMaximized()
 
 app.exec()
