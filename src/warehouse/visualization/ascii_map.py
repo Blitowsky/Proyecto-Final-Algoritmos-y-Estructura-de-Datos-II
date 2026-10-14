@@ -15,12 +15,12 @@ def hall_symbol(cell):
     return "+" if cell.declared else "."          # AMBOS
 
 
-def render_rows(warehouse, marks=None):
+def render_rows(floor, marks=None):
     """
     Returns one string per row, from y = height-1 (first) down to y = 0 (last).
     marks: optional LinkedList of cell ids to draw as K (for example the pickers' start cells).
     """
-    marked = Dictionary(warehouse.width * warehouse.height)  # cell id -> True, only used while drawing
+    marked = Dictionary(floor.width * floor.height)  # cell id -> True, only used while drawing
     if marks is not None:
         cid = marks.head
         while cid is not None:
@@ -28,11 +28,11 @@ def render_rows(warehouse, marks=None):
             cid = cid.nextNode
 
     rows = []
-    for y in range(warehouse.height - 1, -1, -1):
+    for y in range(floor.height - 1, -1, -1):
         row = ""
-        for x in range(warehouse.width):
-            cid = warehouse.cell_id(x, y)
-            cell = search(warehouse.grid, cid)
+        for x in range(floor.width):
+            cid = floor.cell_id(x, y)
+            cell = search(floor.grid, cid)
             if cell is None:
                 continue
             if search(marked, cid) and cell.kind == HALL:
@@ -49,14 +49,14 @@ def render_rows(warehouse, marks=None):
     return rows
 
 
-def render_map(warehouse, marks=None):
+def render_map(floor, marks=None):
     """Same rows with the x ruler and y labels, ready to print."""
-    rows = render_rows(warehouse, marks)
+    rows = render_rows(floor, marks)
     ruler = ""
-    for x in range(warehouse.width):
+    for x in range(floor.width):
         ruler += str(x % 10)
     lines = ["      " + ruler]
     for i in range(len(rows)):
-        y = warehouse.height - 1 - i
+        y = floor.height - 1 - i
         lines.append("y=" + str(y).rjust(2) + "  " + rows[i])
     return "\n".join(lines)

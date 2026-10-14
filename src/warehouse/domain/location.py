@@ -1,4 +1,4 @@
-from warehouse.structures.linkedlist import LinkedList
+from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.rack import Rack
 from warehouse.domain.rect import Rect
@@ -8,25 +8,13 @@ OUTBOUND = "OUTBOUND"
 AMBOS = "AMBOS"
 DOOR_KINDS = (INBOUND, OUTBOUND, AMBOS)
 
-# class RackAccess:
-#     def __init__(self, rack: Rack, left: bool, right: bool) -> None:
-#         self.rack: Rack = rack
-#         self.left: bool = left
-#         self.right: bool = right
+EPS = 1e-9
 
 class HallSection:
     def __init__(self, section_id: str, rect: Rect, sentido: str):
         self.id: str = section_id
         self.rect: Rect = rect
         self.sentido: str = sentido
-
-# class HallNode:
-#     def __init__(self, node_id: int, x: int, y: int) -> None:
-#         self.id: int = node_id
-#         self.x: int = x
-#         self.y: int = y
-#         self.rack_access: LinkedList = LinkedList()
-#         self.zone: DispatchZone|None = None
 
 class Door:
     def __init__(self, door_id: str, kind: str, x: int, y: int) -> None:
@@ -48,8 +36,32 @@ class DispatchZone:
         self.door_id: str = door_id
         self.rect: Rect = rect
         self.max_weight: float = max_weight
+
         self.door: Door|None = None
+        self.access: LinkedList = LinkedList()
+        self.items: LinkedList = LinkedList()
+        self.load: float = 0.0
 
     @property
     def is_outbound(self) -> bool:
         return self.door is not None and self.door.is_outbound
+
+    def can_accept(self, weight: float) -> bool:
+        return self.load + weight <= self.max_weight + EPS
+    
+    def deposit(self, items: LinkedList, weight: float) -> None:
+        if not self.can_accept(weight):
+            raise ValueError(f"La zona de despacho {self.id} no puede tomar {weight}kg más ({self.max_weight - self.load}kg restantes).")
+        i = items.head
+        while i is not None:
+            if i.value is None:
+                i = i.nextNode
+                continue
+            item = i.value
+            add(self.items, item)
+            i = i.nextNode
+        self.load += weight
+
+    def reset(self):
+        self.items = LinkedList()
+        self.load = 0.0

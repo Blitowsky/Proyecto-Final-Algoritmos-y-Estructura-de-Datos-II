@@ -41,9 +41,9 @@ def load_config(path):
     return config
 
 
-def read_dimensions(warehouse: dict) -> tuple[int, int]:
-    require_keys(warehouse, ("dimensiones",), "El warehouse")
-    dim = warehouse["dimensiones"]
+def read_dimensions(floor: dict) -> tuple[int, int]:
+    require_keys(floor, ("dimensiones",), "El warehouse")
+    dim = floor["dimensiones"]
     require_keys(dim, ("ancho_x", "largo_y"), "Las dimensiones")
     width = require_positive_int(dim["ancho_x"], "dimensiones.ancho_x")
     height = require_positive_int(dim["largo_y"], "dimensiones.largo_y")

@@ -7,10 +7,8 @@ AMBOS = "AMBOS"
 SENTIDOS = (N, S, E, O, AMBOS)
 MOVES = (N, S, E, O)
 
-
 def is_sentido(value: str) -> bool:
     return value in SENTIDOS
-
 
 def step(direction: str) -> tuple[int, int]:
     if direction == N:
@@ -23,7 +21,6 @@ def step(direction: str) -> tuple[int, int]:
         return -1, 0
     raise ValueError(f"{direction} no es una dirección válida.")
 
-
 def opposite(direction: str) -> str:
     if direction == N:
         return S
@@ -34,7 +31,6 @@ def opposite(direction: str) -> str:
     if direction == O:
         return E
     raise ValueError(f"{direction} no es una dirección válida.")
-
 
 def allows(sentido: str, move: str) -> bool:
     if sentido == AMBOS:
