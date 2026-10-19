@@ -6,7 +6,7 @@ from warehouse.services.warehouse_loader import build_floor, build_warehouse
 from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.visualization.ascii_map import render_map, render_rows
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_basico.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 
 config = load_config(SCENARIO)
 warehouse = build_warehouse(config)
