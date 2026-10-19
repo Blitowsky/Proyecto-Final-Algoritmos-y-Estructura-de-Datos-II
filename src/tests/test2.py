@@ -1,5 +1,5 @@
 import os
-import pickle
+
 
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.hall_graph_builder import build_hall_graph
@@ -10,9 +10,7 @@ from warehouse.persistence.save_load import load, save
 
 
 
-from contextlib import redirect_stdout, redirect_stderr
-from collections import Counter
-import sys
+
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 config = load_config(SCENARIO)
 
