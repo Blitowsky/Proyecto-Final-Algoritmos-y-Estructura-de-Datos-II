@@ -1,5 +1,5 @@
 from warehouse.domain.product import Product
-from warehouse.domain.warehouse import WareHouse
+from warehouse.domain.warehouse import Floor, WareHouse
 
 from warehouse.structures.dictionary import search
 from warehouse.structures.linkedlist import LinkedList, add
@@ -17,8 +17,8 @@ class PickedItem:
         return self.product.weight * self.qty
 
 class Picker:
-    def __init__(self, picker_id: int, start_node: int, capacity: float) -> None:
-        self.id: int = picker_id
+    def __init__(self, picker_id: str, start_node: int, capacity: float) -> None:
+        self.id: str = picker_id
         self.start_node: int = start_node
         self.capacity: float = capacity
 
@@ -61,7 +61,7 @@ class Picker:
         return weight
 
     def is_at_access_hall(self, product: Product) -> bool:
-        hall_id = product.half.access_halls.head
+        hall_id = product.cell.access.head
         while hall_id is not None:
             if hall_id.value == self.node:
                 return True
@@ -87,13 +87,32 @@ class Picker:
 
 
     def drop_off(self, warehouse: WareHouse) -> LinkedList:
-        hall = search(warehouse.halls, self.node)
-        if hall is None:
-            raise ValueError(f"El picker {self.id} está en un pasillo inválido.")
-        if hall.zone is None:
-            raise ValueError(f"El picker {self.id} está en el nodo {self.node}, que no es una zona de despacho.")
+        zones = warehouse.dropoff_zones_at(self.node)
+
+        if zones is None:
+            raise ValueError(f"El picker {self.id} está en el nodo {self.node}, que no está junto a ninguna zona de despacho.")
+
+        chosen_zone = None
+        any_outbound = False
+        node = zones.head
+        while node is not None:
+            if node.value is None:
+                node = node.nextNode
+                continue
+            zone = node.value
+            if zone.is_outbound:
+                any_outbound = True
+                if chosen_zone is None and zone.can_accept(self.load):
+                    chosen_zone = zone
+            node = node.nextNode
+
+        if not any_outbound:
+            raise ValueError(f"El picker {self.id} está junto a zonas cuya puerta es INBOUND: no se puede despachar desde ahí.")
+        if chosen_zone is None:
+            raise ValueError(f"Ninguna zona de despacho vecina puede recibir {self.load}kg más.")
 
         dropped = self.carried
+        chosen_zone.deposit(dropped, self.load)
         item = dropped.head
         while item is not None:
             add(self.delivered, item.value)

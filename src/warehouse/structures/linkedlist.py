@@ -2,6 +2,24 @@ class LinkedList:
     def __init__(self):
         self.head: Node|None = None
         self.tail: Node|None = None
+    
+    def __getstate__(self):
+        valores = []
+        actual = self.head
+
+        while actual is not None:
+            valores.append(actual.value)
+            actual = actual.nextNode
+
+        return valores
+
+    def __setstate__(self, valores):
+        self.head = None
+        self.tail = None
+
+        for valor in valores:
+            add(self, valor)
+
 
     def print_list(self):
         current = self.head
@@ -9,6 +27,8 @@ class LinkedList:
             print(current.value, end=" -> ")
             current = current.nextNode
         print("None")
+    
+
 
 class Node:
     def __init__(self, value=None):
@@ -120,3 +140,4 @@ def print_list(L):
         currentNode = currentNode.nextNode
     print("")
     return
+
