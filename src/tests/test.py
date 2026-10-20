@@ -25,3 +25,4 @@ def test_grid(floor):
 test_grid(warehouse.floor)
 print()
 
+warehouse.graph.printGraph()
