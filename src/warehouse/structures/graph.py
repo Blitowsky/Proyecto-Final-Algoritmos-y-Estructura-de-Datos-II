@@ -2,7 +2,6 @@ from typing import Any, cast
 import copy
 
 from warehouse.structures.dictionary import *
-from warehouse.structures.myqueue import *
 
 class Graph:
     def __init__(self, v: lk.LinkedList, e: lk.LinkedList, m: int|None = None) -> None:
@@ -108,6 +107,9 @@ class DisjointSet:
 
         curr_v = v.head
         while curr_v is not None:
+            if curr_v.value is None:
+                curr_v = curr_v.nextNode
+                continue
             curr_v.value = int(curr_v.value) if str(curr_v.value).isdigit() else sum(ch for ch in curr_v.value) % len_v
             insert(self.parent, curr_v.value)
             insert(self.rank, 0, key = curr_v.value)
