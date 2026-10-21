@@ -7,11 +7,12 @@ from warehouse.services.warehouse_loader import build_floor, build_warehouse
 from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
 from warehouse.persistence.save_load import load, save
+from warehouse.algorithms.oredenarPedidos import ordenarPedidos
 
 
 
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_basico.json")
 config = load_config(SCENARIO)
 
 warehouse = load()
@@ -23,6 +24,12 @@ if warehouse is None:
     save(warehouse)
 
 
+ordenarPedidos(warehouse.orders)
+
+
+
+
+"""
 def picker_start_cells(config, floor):
     cells = LinkedList()
     for p in config["pickers"]:
@@ -37,3 +44,4 @@ def test_grid(floor):
 test_grid(warehouse.floor)
 print()
 
+"""
