@@ -9,6 +9,7 @@ from warehouse.domain.route import PickLine, Stop
 from warehouse.domain.picker import Picker
 from warehouse.domain.warehouse import WareHouse
 from warehouse.domain.location import DispatchZone
+from warehouse.domain.wave import Assignment, Wave
 
 EPS = 1e-9
 
@@ -120,3 +121,66 @@ def choose_zone(warehouse: WareHouse, picker: Picker, weight: float, algorithm: 
             best_distance = found.distance
         z = z.nextNode
     return best
+
+def assign_wave(
+    warehouse: WareHouse,
+    wave: Wave,
+    pickers: list[Picker]|None = None,
+    algorithm: str = "bfs"
+) -> LinkedList:
+    if wave.status != "created" or wave.assignment_count > 0:
+        raise ValueError(f"La wave {wave.id} está '{wave.status}' y ya tiene {wave.assignment_count} asignaciones.")
+
+    candidates = free_pickers(warehouse) if pickers is None else list(pickers)
+    if len(candidates) == 0:
+        raise ValueError(f"No hay pickers libres para la wave {wave.id}.")
+
+    parts = split_load(merge_lines(wave.lines), candidates)
+    if parts is None:
+        raise ValueError(f"Los {wave.total_weight}kg de la wave {wave.id} no pueden ser cargados por los pickers disponibles: " +
+        ", ".join(str(p.id) + " " + str(p.remaining()) + "kg" for p in candidates))
+
+    try:
+        for picker, shares in parts:
+            share_list = LinkedList()
+            for line in shares:
+                add(share_list, line)
+            weight = 0.0
+            for line in shares:
+                weight += line.product.weight * line.qty
+
+            zone = choose_zone(warehouse, picker, weight, algorithm)
+            if zone is None:
+                raise ValueError(f"Ninguna zona de despacho puede aceptar los {weight}kg del picker {picker.id}.")
+            zone.reserve(weight)
+            assignment = Assignment(
+                    wave,
+                    picker,
+                    zone,
+                    share_list,
+                    build_stops(warehouse, shares)
+                )
+            picker.assignment = assignment
+            add(wave.assignments, assignment)
+            wave.assignment_count += 1
+    except ValueError:
+        cancel_assignments(wave)
+        raise
+    
+    wave.status = "wave_assigned"
+    return wave.assignments
+
+def cancel_assignments(wave: Wave) -> None:
+    if wave.status not in ("created", "wave_assigned"):
+        raise ValueError(f"La wave {wave.id} está '{wave.status}', sus asignaciones no pueden ser canceladas.")
+    assignment = wave.assignments.head
+    while assignment is not None:
+        if assignment.value is None:
+            assignment = assignment.nextNode
+            continue
+        assignment.value.zone.release(assignment.value.weight)
+        assignment.value.picker.assignment = None
+        assignment = assignment.nextNode
+    wave.assignments = LinkedList()
+    wave.assignment_count = 0
+    wave.status = "created"
