@@ -8,6 +8,7 @@ from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
 from warehouse.persistence.save_load import load, save
 from warehouse.algorithms.oredenarPedidos import ordenarPedidos
+from warehouse.algorithms.generacioWave import generacionWaves
 
 
 
@@ -24,7 +25,9 @@ if warehouse is None:
     save(warehouse)
 
 
-ordenarPedidos(warehouse.orders)
+#ordenarPedidos(warehouse.orders)
+
+generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
 
 
 

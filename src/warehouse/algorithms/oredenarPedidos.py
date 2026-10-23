@@ -6,10 +6,10 @@ def ordenarPedidos(ordenes):
     while nodeOrder is not None:
 
         disMin = 1000000000
-        disMax, contador, disManhattan, suma = 0 
+        disMax, contador, disManhattan, suma = 0, 0, 0, 0
         currentNodeLineA =nodeLine
         currentNodeLineB = nodeLine.nextNode  
-
+        centro = centroide(currentNodeLineA)
         while currentNodeLineB is not None and currentNodeLineA is not None:
             disX = abs(currentNodeLineA.value.product.x - currentNodeLineB.value.product.x)
             disY = abs(currentNodeLineA.value.product.y - currentNodeLineB.value.product.y)
@@ -29,14 +29,14 @@ def ordenarPedidos(ordenes):
                 currentNodeLineB=currentNodeLineB.nextNode
         if suma == 0:
 # estan en la misma posicion
-            pedidosPonderados.append((nodeOrder.value.id , ponderar(nodeOrder.value.priority,0)))
+            pedidosPonderados.append((nodeOrder.value , ponderar(nodeOrder.value.priority,0) , centro))
         elif disMin == disMax:
 # si se encuentran a la misma distancia no nos dice nada si esta lejo o no 
-            pedidosPonderados.append((nodeOrder.value.id , ponderar(nodeOrder.value.priority,0.5)))
+            pedidosPonderados.append((nodeOrder.value , ponderar(nodeOrder.value.priority,0.5) , centro))
         else:
             disMedia = suma / contador                
             disNormal = (disMedia - disMin) / (disMax - disMin)
-            pedidosPonderados.append((nodeOrder.value.id , ponderar(nodeOrder.value.priority,disNormal)))
+            pedidosPonderados.append((nodeOrder.value , ponderar(nodeOrder.value.priority,disNormal) , centro))
 
         nodeOrder = nodeOrder.nextNode
         if nodeOrder is not None:
@@ -45,8 +45,8 @@ def ordenarPedidos(ordenes):
     pedidosPonderados.sort(key=lambda x: x[1], reverse=True)
     
 # prueba de valores
-#    for pedido, val in pedidosPonderados:
-#        print(pedido+" tiene val: "+ str(val))
+#    for pedido, val, cen in pedidosPonderados:
+#        print(pedido.id+" tiene val: "+ str(val)+ " su centro es: "+ str(cen[:]))
 
     return pedidosPonderados
 
@@ -57,3 +57,13 @@ def ponderar(prioridad, val):
     # la ponderacion me da 0.3
     ponderacion=0.7 * prioridad + 0.3 * (1 -val) 
     return ponderacion
+
+def centroide(node):
+    currenNode = node
+    x, y, contador =0, 0, 0
+    while currenNode is not None:
+        x += currenNode.value.product.x
+        y += currenNode.value.product.y
+        contador +=1
+        currenNode = currenNode.nextNode
+    return (x/contador , y/contador)
