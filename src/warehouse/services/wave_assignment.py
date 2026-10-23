@@ -92,10 +92,7 @@ def free_pickers(warehouse: WareHouse) -> list[Picker]:
     free = []
     picker = warehouse.pickers.head
     while picker is not None:
-        if picker.value is None:
-            picker = picker.nextNode
-            continue
-        if picker.value.assignment is None:
+        if picker.value is not None and picker.value.assignment is None:
             free.append(picker.value)
         picker = picker.nextNode
     return free
@@ -143,10 +140,9 @@ def assign_wave(
     try:
         for picker, shares in parts:
             share_list = LinkedList()
-            for line in shares:
-                add(share_list, line)
             weight = 0.0
             for line in shares:
+                add(share_list, line)
                 weight += line.product.weight * line.qty
 
             zone = choose_zone(warehouse, picker, weight, algorithm)
@@ -167,11 +163,11 @@ def assign_wave(
         cancel_assignments(wave)
         raise
     
-    wave.status = "wave_assigned"
+    wave.status = "assigned"
     return wave.assignments
 
 def cancel_assignments(wave: Wave) -> None:
-    if wave.status not in ("created", "wave_assigned"):
+    if wave.status not in ("created", "assigned"):
         raise ValueError(f"La wave {wave.id} está '{wave.status}', sus asignaciones no pueden ser canceladas.")
     assignment = wave.assignments.head
     while assignment is not None:

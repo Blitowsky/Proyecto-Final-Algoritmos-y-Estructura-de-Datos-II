@@ -79,7 +79,7 @@ class Route:
         self.zone: DispatchZone = zone
         self.legs: LinkedList = LinkedList()
         self.leg_count: int = 0
-        self.distance: int = 0
+        self.distance: float = 0.0
         self.edges: int = 0
         self.executed: bool = False
 
@@ -97,7 +97,7 @@ class Route:
     def add(self, leg: Leg) -> None:
         add(self.legs, leg)
         self.leg_count += 1
-        self.distances += leg.distance
+        self.distance += leg.distance
         self.edges += leg.edges
 
     def distinct_nodes(self, table_size: int) -> int:

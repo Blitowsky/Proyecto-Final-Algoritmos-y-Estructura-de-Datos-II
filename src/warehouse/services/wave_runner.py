@@ -1,6 +1,8 @@
+from warehouse.services.wave_assignment import assign_wave
+from warehouse.services.wave_builder import WaveBuilder
 from warehouse.structures.linkedlist import LinkedList
 
-from warehouse.services.route_runner import plan_route, check_route, run_route
+from warehouse.services.route_runner import plan_route, _check_can_serve, run_route
 
 from warehouse.domain.route import Route
 from warehouse.domain.warehouse import WareHouse
@@ -24,7 +26,7 @@ def run_assignment(
         # TODO
 
     route = plan_route(warehouse, picker.node, stops, assignment.zone)
-    # check_route
+    _check_can_serve(picker, route)
 
     if wave.status == "assigned":
         wave.status = "running"
@@ -72,4 +74,19 @@ def run_wave(
         if assignment.value is not None and assignment.value.status == "assigned":
             run_assignment(warehouse, assignment.value, stop_orderer, algorithm)
         assignment = assignment.nextNode
+
+def process_pending(
+    warehouse: WareHouse,
+    selector = None,
+    stop_orderer = None,
+    algorithm: str = "bfs"
+) -> tuple[LinkedList, LinkedList]:
+    waves, rejected = WaveBuilder(warehouse, selector).build()
+    wave = waves.head
+    while wave is not None:
+        if wave.value is not None:
+            assign_wave(warehouse, wave.value, None, algorithm)
+            run_wave(warehouse, wave.value, stop_orderer, algorithm)
+        wave = wave.nextNode
+    return waves, rejected
 

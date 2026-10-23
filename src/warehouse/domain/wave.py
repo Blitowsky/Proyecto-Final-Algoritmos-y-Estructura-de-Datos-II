@@ -4,7 +4,7 @@ from warehouse.structures.dictionary import Dictionary, search, insert
 from warehouse.domain.product import Product
 from warehouse.domain.order import Order
 from warehouse.domain.location import DispatchZone
-from warehouse.domain.picker import Picker
+# from warehouse.domain.picker import Picker
 from warehouse.domain.route import Route
 
 class WaveConfig:
@@ -112,13 +112,13 @@ class Assignment:
     def __init__(
         self, 
         wave: Wave, 
-        picker: Picker, 
+        picker, 
         zone: DispatchZone,
         shares: LinkedList,
         stops: LinkedList
     ) -> None:
         self.wave: Wave = wave
-        self.picker: Picker = picker
+        self.picker = picker
         self.zone: DispatchZone = zone
         self.shares: LinkedList = shares
         self.stops: LinkedList = stops
