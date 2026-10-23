@@ -13,7 +13,7 @@ from warehouse.algorithms.generacioWave import generacionWaves
 
 
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_basico.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 config = load_config(SCENARIO)
 
 warehouse = load()

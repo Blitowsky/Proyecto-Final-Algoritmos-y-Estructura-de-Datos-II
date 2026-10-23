@@ -12,12 +12,23 @@ def generacionWaves(ordenes, pickers, config):
         currentNode = currentNode.nextNode
 
     maxPicker = len(picker)
-    index, id=0, 0
+    indexPed, id = 0, 0
     waves = []
-    
+    #wave = Wave(str(id), config)
+    muesta=pedidos[0]
+    lista= unaWavePorPicker(pedidos,config,picker)
+    print("nueva funcion")
 
-    
-    wave = Wave(str(id), config)
+    for wave in lista:
+        print( wave.id+" con esta cantidad de pedidos "+ str(wave.total_units))
+
+
+"""
+#Pruebo si devuelve lista o no con sus respectivos valores.
+    print(str(muesta[0].id) + " , " + str(muesta[1]))
+    for ped, val, cen in lista:
+        print(ped.id + " tien una valor de: " + str(val) + " con respecto a " +str(muesta[2]) + " con centro: " + str(cen) )
+
     maxPedido = config.max_orders
     maxProducto = config.max_products
 
@@ -35,8 +46,40 @@ def generacionWaves(ordenes, pickers, config):
     print(pedido[0].id)
     pedidos.remove(pedido)
 
-    
-        
+"""   
+def unaWavePorPicker(pedidos, config, pickers):
+    indexPed = 0
+    listaWave = []
+    for i in range(len(pickers)):
+        capasidad = pickers[i].capacity
+        muestra = pedidos.pop(0)
+        pedCercanos = listaPedMinimo(pedidos, muestra[2])
+        wave = Wave(str(indexPed), config)
+        indexPed += 1
+        wave.add_order(muestra[0])
+        capasidad -= wave.total_weight
+        for ped, val in pedCercanos:
+            if wave.fits(ped) and capasidad + ped.total_weight < pickers[i].capacity :
+                wave.add_order(ped)
+                print("aca")
+                print(ped.id+" pedido eliminado")
+                pedidos = [t for t in pedidos if t[0] != ped]
+                for ped, val, cen in pedidos:
+                    print()
+                    print(ped.id+"quedan")
+        print()
+        listaWave.append(wave)
+    return listaWave
+
+
+
+
+def listaPedMinimo(pedidos, muestra):
+    listaPedido = []
+    for ped, val, cen in pedidos:
+        listaPedido.append((ped ,math.dist(muestra, cen)))
+    listaPedido.sort(key=lambda x: x[1])
+    return listaPedido
 
 
 def pedMinimo(pedidos, muestra, maxProducto):
