@@ -1,5 +1,5 @@
 from warehouse.structures.linkedlist import LinkedList, add
-from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, search, insert
 
 from warehouse.domain.product import Product
 from warehouse.domain.order import Order
@@ -28,7 +28,7 @@ class Wave:
 
         self.orders: LinkedList = LinkedList()
         self.lines: LinkedList = LinkedList()
-        self.line_index: Dictionary = Dictionary(2 * config.max_products + 1)
+        self.line_index: CloseDictionary = CloseDictionary(2 * config.max_products + 1)
 
         self.order_count: int = 0
         self.product_count: int = 0
