@@ -32,7 +32,7 @@ class Walker:
         self.start_tick: int|None = None
         self.distance_at_start: int = self.picker.distance
         self.waited: int = 0
-        self.waiting_for: int|None = None
+        self.waiting_for: str|None = None
 
         self.moves: int = 0
         self.waits: int = 0
@@ -82,7 +82,7 @@ class Walker:
         self._enter_next_leg()
         return leg
 
-    def refused(self, blocker: int) -> None:
+    def refused(self, blocker: str|None) -> None:
         self.waits += 1
         self.waited += 1
         self.waiting_for = blocker

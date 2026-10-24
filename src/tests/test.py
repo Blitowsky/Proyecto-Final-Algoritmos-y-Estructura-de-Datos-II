@@ -5,11 +5,13 @@ from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.hall_graph_builder import build_hall_graph
 from warehouse.services.route_runner import move_picker
 from warehouse.services.warehouse_loader import build_floor, build_warehouse
+from warehouse.services.wave_builder import WaveBuilder
 from warehouse.services.wave_runner import process_pending
+from warehouse.simulation.simulation import Simulation
 from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_basico.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 
 config = load_config(SCENARIO)
 warehouse = build_warehouse(config)
@@ -82,37 +84,57 @@ print()
 # add(picker0_node, picker0.node)
 # print(render_map(warehouse.floor, picker0_node))
 
-waves, rejected = process_pending(warehouse)
-print("WAVES: ")
-for wave in list(waves):
-    if wave is None:
-        continue
-    print(f"Wave {wave.id} ({wave.status})")
-    print(f"Orders: {", ".join([o.id for o in list(wave.orders)])}")
-    for line in list(wave.lines):
-        if line is None:
-            continue
-        x = line.product.cell.x
-        y = line.product.cell.y
-        z = line.product.z
-        print(f"{line.product.id}; {line.product.weight}kg ({line.qty}) <{x}, {y}, {z}>")
-    print("Assignments:")
-    for i, assignment in enumerate(list(wave.assignments)):
-        if assignment is None:
-            continue
-        print(f"Assignment {i}; picker {assignment.picker.id} ({assignment.picker.capacity}kg); dispatch zone {assignment.zone.id}:")
-        for leg in list(assignment.route.legs):
-            if leg is None:
-                continue
-            node = leg.path.head
-            while node is not None:
-                if node.value:
-                    print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-                node = node.nextNode
-            print("None")
-    print()
+# waves, rejected = process_pending(warehouse)
+# print("WAVES: ")
+# for wave in list(waves):
+#     if wave is None:
+#         continue
+#     print(f"Wave {wave.id} ({wave.status})")
+#     print(f"Orders: {", ".join([o.id for o in list(wave.orders)])}")
+#     for line in list(wave.lines):
+#         if line is None:
+#             continue
+#         x = line.product.cell.x
+#         y = line.product.cell.y
+#         z = line.product.z
+#         print(f"{line.product.id}; {line.product.weight}kg ({line.qty}) <{x}, {y}, {z}>")
+#     print("Assignments:")
+#     for i, assignment in enumerate(list(wave.assignments)):
+#         if assignment is None:
+#             continue
+#         print(f"Assignment {i}; picker {assignment.picker.id} ({assignment.picker.capacity}kg); dispatch zone {assignment.zone.id}:")
+#         for leg in list(assignment.route.legs):
+#             if leg is None:
+#                 continue
+#             node = leg.path.head
+#             while node is not None:
+#                 if node.value:
+#                     print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
+#                 node = node.nextNode
+#             print("None")
+#     print()
+#
+# print("REJECTED: ", length(rejected))
+# print()
+#
+# print(render_map(warehouse.floor, picker_current_cells(warehouse)))
 
-print("REJECTED: ", length(rejected))
+waves, rejected = WaveBuilder(warehouse, pickers=warehouse.pickers).build()
+
+simulation = Simulation(
+        warehouse,
+        algorithm="bfs",
+        auto_assign=True
+    )
+
+simulation.run()
+
+print(simulation.summary())
+print()
+
+for event in simulation.events:
+    if event.kind != "move":
+        print(event.describe(warehouse))
 print()
 
 print(render_map(warehouse.floor, picker_current_cells(warehouse)))

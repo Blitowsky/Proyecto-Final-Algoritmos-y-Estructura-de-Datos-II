@@ -2,11 +2,11 @@ from warehouse.structures.dictionary import Dictionary, insert, search
 
 
 class Move:
-    def __init__(self, picker: str, src: int, dst: int, rank: int) -> None:
+    def __init__(self, picker: str, src: int, dst: int, rank: tuple[int, int, str]) -> None:
         self.picker: str = picker
         self.src: int = src
         self.dst: int = dst
-        self.rank: int = rank
+        self.rank: tuple[int, int, str] = rank
         self.granted: bool = True
         self.reason: str|None = None
         self.blocker: str|None = None
