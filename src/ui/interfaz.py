@@ -1,10 +1,14 @@
 import sys
 
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
+from PyQt6.QtCore import QTimer
 
+from warehouse.services.wave_builder import WaveBuilder
+from warehouse.simulation.simulation import Simulation
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
+
 
 #Tipos de celdas que puede tener el warehouse
 from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
@@ -12,18 +16,74 @@ from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 
 class Ventana(QWidget):
 
-    def __init__(self, warehouse):
+    def __init__(self, warehouse, simulation):
         super().__init__()
 
         #Guardo el warehouse que recibo
         self.warehouse = warehouse
+        
+        #Guardo la simulacion
+        self.simulation = simulation
 
         #Espacio que dejo alrededor del warehouse
-        self.margen = 30
+        self.margen = 60
 
         #Valor inicial, despues se calcula dependiendo del tamaño de la ventana
         self.escala = 1
+        
+        #Timer que va avanzando la simulacion
+        self.timer = QTimer(self)
 
+        #Cada vez que el timer se activa ejecuto un tick
+        self.timer.timeout.connect(self.avanzar_simulacion)
+
+        #Tiempo entre ticks
+        self.timer.setInterval(300)
+        
+        
+        # ==================================================
+        # BOTONES
+        # ==================================================
+        
+        
+        #Boton para iniciar la simulacion
+        self.boton_play = QPushButton("Play", self)
+        self.boton_play.setGeometry(30, 10, 80, 30)
+        self.boton_play.clicked.connect(self.play)
+
+
+        #Boton para pausar la simulacion
+        self.boton_pause = QPushButton("Pause", self)
+        self.boton_pause.setGeometry(120, 10, 80, 30)
+        self.boton_pause.clicked.connect(self.pause)
+
+
+        #Boton para avanzar un solo tick
+        self.boton_paso = QPushButton("Paso", self)
+        self.boton_paso.setGeometry(210, 10, 80, 30)
+        self.boton_paso.clicked.connect(self.paso)
+
+    def play(self):
+
+        #Si la simulacion no termino, comienzo el timer
+        if not self.simulation.finished:
+            self.timer.start()
+
+
+    def pause(self):
+
+        #Detengo el timer
+        self.timer.stop()
+
+
+    def paso(self):
+
+        #Si termino no hago nada
+        if self.simulation.finished:
+            return
+
+        #Avanzo solamente un tick
+        self.avanzar_simulacion()
 
     def calcular_escala(self):
 
@@ -48,6 +108,34 @@ class Ventana(QWidget):
         yp = self.margen + (self.warehouse.height - 1 - y) * self.escala
 
         return xp, yp
+
+
+    def avanzar_simulacion(self):
+
+        #Si la simulacion ya termino detengo el timer
+        if self.simulation.finished:
+
+            self.timer.stop()
+
+            print("Simulacion terminada")
+            print(self.simulation.summary())
+
+            return
+
+
+        #Ejecuto un solo tick
+        eventos = self.simulation.step()
+
+        #Muestro por consola los eventos importantes
+        for evento in eventos:
+
+            if evento.kind != "move":
+
+                print(evento.describe(self.warehouse))
+
+
+        #Le digo a PyQt que vuelva a dibujar la ventana
+        self.update()
 
 
     def paintEvent(self, event):
@@ -197,12 +285,15 @@ class Ventana(QWidget):
 
                     #El producto esta guardado en la segunda posicion de la tupla
                     producto = actual_producto.value[1]
+                    
+                    #Solo dibujo el producto si todavia tiene stock
+                    if producto.stock is None or producto.stock > 0:
 
-                    #Product.x y Product.y obtienen la posicion de su RackCell
-                    xp, yp = self.coordenada_a_pixel(producto.x, producto.y)
+                        #Product.x y Product.y obtienen la posicion de su RackCell
+                        xp, yp = self.coordenada_a_pixel(producto.x, producto.y)
 
-                    #Dibujo un cuadrado naranja para indicar que hay producto
-                    painter.drawRect(xp + self.escala - 12, yp + 4, 8, 8)
+                        #Dibujo un cuadrado naranja para indicar que hay producto
+                        painter.drawRect(xp + self.escala - 12, yp + 4, 8, 8)
 
                 actual_producto = actual_producto.nextNode
 
@@ -244,16 +335,28 @@ class Ventana(QWidget):
 
 app = QApplication(sys.argv)
 
-#Cargo directamente el escenario oficial
+#Cargo el escenario
 config = load_config("src/data/escenario_basico.json")
 
 #Construyo el warehouse
 warehouse = build_warehouse(config)
 
-#Creo la ventana
-ventana = Ventana(warehouse)
+#Creo las waves a partir de los pedidos
+waves, rejected = WaveBuilder(
+    warehouse,
+    pickers=warehouse.pickers
+).build()
 
-#La abro maximizada
+#Creo la simulacion
+simulation = Simulation(
+    warehouse,
+    algorithm="bfs",
+    auto_assign=True
+)
+
+#Creo la ventana y le paso el warehouse y la simulacion
+ventana = Ventana(warehouse, simulation)
+
 ventana.showMaximized()
 
 app.exec()
