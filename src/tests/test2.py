@@ -13,16 +13,22 @@ from warehouse.algorithms.generacioWave import generacionWaves
 
 
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_basico_mod.json")
 config = load_config(SCENARIO)
 
-warehouse = load()
+warehouse = None
 
-if warehouse is None:
-    print("paso por aca")
-    config = load_config(SCENARIO)
-    warehouse = build_warehouse(config)
-    save(warehouse)
+res=input("queres cargar o comenzar uno nuevo ")
+if res == "1":
+    print("a")
+    warehouse = load()
+    print("b")
+else:
+    if warehouse is None:
+        print("paso por aca")
+        config = load_config(SCENARIO)
+        warehouse = build_warehouse(config)
+        save(warehouse)
 
 
 #ordenarPedidos(warehouse.orders)

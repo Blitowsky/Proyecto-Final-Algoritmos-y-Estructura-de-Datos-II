@@ -11,42 +11,61 @@ def generacionWaves(ordenes, pickers, config):
         picker.append(currentNode.value)
         currentNode = currentNode.nextNode
 
-    maxPicker = len(picker)
-    indexPed, id = 0, 0
-    waves = []
-    #wave = Wave(str(id), config)
-    muesta=pedidos[0]
-    lista= unaWavePorPicker(pedidos,config,picker)
-    print("nueva funcion")
+    lista= listaDeWaveParaTodasLasOrdenes(pedidos,config,picker)
 
-    for wave in lista:
-        print( wave.id+" con esta cantidad de pedidos "+ str(wave.total_units))
+    for i in range(len(picker)):
+        print(f"Picker {i} con un peso de {picker[i].capacity}")
+        for wave in lista[i]:
+            suma=0
+            print(f"Wave {wave.id}")
+            currentNode = wave.orders.head
+            while currentNode is not None:
+                 print(f"    {currentNode.value.id} con un peso de {currentNode.value.total_weight}")
+                 suma+=currentNode.value.total_weight
+                 currentNode = currentNode.nextNode
+            print(suma)
+        print()
+        
+    return lista
+    #for wave in lista:
+    #    print( wave.id+" con esta cantidad de pedidos "+ str(wave.total_units))
 
+def listaDeWaveParaTodasLasOrdenes(pedidos, config, pickers):
+    indexPed = 0     
+    waves_por_picker = [[] for _ in range(len(pickers))]
+    while pedidos is not None:
+        for i in range(len(pickers)):  
+            capasidad = pickers[i].capacity
+            muestra = pedidos.pop(0)
+            #print(f"{i} en {muestra[0].id}")
+            pedCercanos = listaPedMinimo(pedidos, muestra[2])
+            wave = Wave(str(indexPed), config)
+            indexPed += 1
+            wave.add_order(muestra[0])
+            capasidad -= wave.total_weight
+            for ped, val in pedCercanos:
+                if wave.fits(ped) and capasidad - ped.total_weight >= 0 :
+                    #print(f"agrego {ped.id} a la wave {wave.id}")
+                    wave.add_order(ped)
+                    capasidad -= ped.total_weight
+                    """
+                    print("aca")
+                    print(ped.id+" pedido eliminado")
+                    """
+                    pedidos = [t for t in pedidos if t[0] != ped]
+                    """
+                    for ped, val, cen in pedidos:
+                        print()
+                        print(ped.id+"quedan")
+                    """        
+            waves_por_picker[i].append(wave)
+            if not pedidos:
+                break
+        if not pedidos:
+                        break
+    return waves_por_picker
 
-"""
-#Pruebo si devuelve lista o no con sus respectivos valores.
-    print(str(muesta[0].id) + " , " + str(muesta[1]))
-    for ped, val, cen in lista:
-        print(ped.id + " tien una valor de: " + str(val) + " con respecto a " +str(muesta[2]) + " con centro: " + str(cen) )
-
-    maxPedido = config.max_orders
-    maxProducto = config.max_products
-
-    orden = pedidos[0]
-    #agregar la funcionalidad de que si supera agarrar solo una parte.
-    if orden[0].total_units <= maxProducto:
-        maxProducto -= orden[0].total_units
-        maxPedido -= 1
-        wave.add_order(orden[0])
-        pedidos.remove(orden)
-
-    pedido = pedMinimo(pedidos, orden[2 ], maxProducto)
-    wave.add_order(pedido[0])
-    maxProducto -= pedido[0].total_units
-    print(pedido[0].id)
-    pedidos.remove(pedido)
-
-"""   
+ 
 def unaWavePorPicker(pedidos, config, pickers):
     indexPed = 0
     listaWave = []
@@ -61,14 +80,19 @@ def unaWavePorPicker(pedidos, config, pickers):
         for ped, val in pedCercanos:
             if wave.fits(ped) and capasidad + ped.total_weight < pickers[i].capacity :
                 wave.add_order(ped)
+                """
                 print("aca")
                 print(ped.id+" pedido eliminado")
+                """
                 pedidos = [t for t in pedidos if t[0] != ped]
+                """
                 for ped, val, cen in pedidos:
                     print()
                     print(ped.id+"quedan")
-        print()
+                """        
         listaWave.append(wave)
+        if not pedidos:
+            break
     return listaWave
 
 
