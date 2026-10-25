@@ -10,6 +10,19 @@ class Product:
         self.stock: int = stock
         self.cell: RackCell = cell
         self.z: int = z
+        self.reserved: int = 0
+
+    @property
+    def available(self) -> int|None:
+        if self.stock is None:
+            return None
+        return self.stock - self.reserved
+
+    def reserve(self, qty: int) -> None:
+        self.reserved += qty
+
+    def release(self, qty: int) -> None:
+        self.reserved = max(0, self.reserved - qty)
 
     @property
     def x(self) -> int:
