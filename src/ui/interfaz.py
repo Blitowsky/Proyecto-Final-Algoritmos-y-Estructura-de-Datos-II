@@ -1,13 +1,15 @@
 import sys
+import math
 
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel
-from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
 from warehouse.services.wave_builder import WaveBuilder
 from warehouse.simulation.simulation import Simulation
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
+from warehouse.domain.direction import N, S, E, O, AMBOS
 
 
 #Tipos de celdas que puede tener el warehouse
@@ -30,6 +32,11 @@ class Ventana(QWidget):
 
         #Valor inicial, despues se calcula dependiendo del tamaño de la ventana
         self.escala = 1
+        
+        #Imagenes de la interfaz
+        self.imagen_picker = QPixmap("src/ui/assets/construction-worker.png")
+        self.imagen_producto = QPixmap("src/ui/assets/box.png")
+        
         
         #Timer que va avanzando la simulacion
         self.timer = QTimer(self)
@@ -62,6 +69,99 @@ class Ventana(QWidget):
         self.boton_paso = QPushButton("Paso", self)
         self.boton_paso.setGeometry(210, 10, 80, 30)
         self.boton_paso.clicked.connect(self.paso)
+
+    def dibujar_sentido(self, painter, cell, x, y):
+
+        sentido = cell.sentido
+
+        #Si puede circular en ambos sentidos no dibujo flecha
+        if sentido == AMBOS:
+            return
+
+        #Centro de la celda
+        xp, yp = self.coordenada_a_pixel(x, y)
+
+        cx = xp + self.escala // 2
+        cy = yp + self.escala // 2
+
+        #Longitud de la flecha
+        largo = max(3, self.escala // 3)
+
+        #Defino direccion y color
+        if sentido == N:
+            dx = 0
+            dy = -largo
+            color = QColor("blue")
+
+        elif sentido == S:
+            dx = 0
+            dy = largo
+            color = QColor("red")
+
+        elif sentido == E:
+            dx = largo
+            dy = 0
+            color = QColor("green")
+
+        elif sentido == O:
+            dx = -largo
+            dy = 0
+            color = QColor("orange")
+
+        else:
+            return
+
+        painter.setPen(QPen(color, 2))
+
+        self.dibujar_flecha(
+            painter,
+            cx,
+            cy,
+            cx + dx,
+            cy + dy
+        )
+
+    def dibujar_flecha(self, painter, x1, y1, x2, y2):
+
+        #Dibujo la linea principal
+        painter.drawLine(x1, y1, x2, y2)
+
+        #Calculo el angulo de la arista
+        angulo = math.atan2(y2 - y1, x2 - x1)
+
+        #Tamaño de la punta de la flecha
+        tamano_flecha = max(2, min(6, self.escala // 3))
+
+        #No pongo la punta exactamente sobre el nodo destino.
+        #La dejo un poco antes para que se vea mejor.
+        distancia_destino = max(2, self.escala // 4)
+
+        punta_x = x2 - math.cos(angulo) * distancia_destino
+        punta_y = y2 - math.sin(angulo) * distancia_destino
+
+        #Dos lineas que forman la punta
+        angulo1 = angulo + math.radians(150)
+        angulo2 = angulo - math.radians(150)
+
+        x3 = punta_x + math.cos(angulo1) * tamano_flecha
+        y3 = punta_y + math.sin(angulo1) * tamano_flecha
+
+        x4 = punta_x + math.cos(angulo2) * tamano_flecha
+        y4 = punta_y + math.sin(angulo2) * tamano_flecha
+
+        painter.drawLine(
+            int(punta_x),
+            int(punta_y),
+            int(x3),
+            int(y3)
+        )
+
+        painter.drawLine(
+            int(punta_x),
+            int(punta_y),
+            int(x4),
+            int(y4)
+        )
 
     def play(self):
 
@@ -210,7 +310,15 @@ class Ventana(QWidget):
         # ARISTAS DEL GRAFO
         # ==================================================
 
-        painter.setPen(QPen(QColor("black"), 2))
+        if self.escala < 15:
+            color_arista = QColor(190, 190, 190)
+            grosor_arista = 1
+
+        else:
+            color_arista = QColor("black")
+            grosor_arista = 2
+
+        painter.setPen(QPen(color_arista, grosor_arista))
 
         #Empiezo desde la primera arista
         actual = self.warehouse.graph.e.head
@@ -237,6 +345,15 @@ class Ventana(QWidget):
 
             #Dibujo la arista
             painter.drawLine(x1, y1, x2, y2)
+            
+            #Dibujo la arista dirigida
+            #self.dibujar_flecha(
+            #    painter,
+            #    x1,
+            #    y1,
+            #    x2,
+            #    y2
+            #)
 
             #Paso a la siguiente arista
             actual = actual.nextNode
@@ -245,8 +362,17 @@ class Ventana(QWidget):
         # ==================================================
         # CELDAS DE PASILLO
         # ==================================================
+        
+        #Adapto el tamaño de los nodos a la escala
+        if self.escala < 15:
 
-        painter.setBrush(QBrush(QColor("black")))
+            painter.setBrush(QBrush(QColor(150, 150, 150)))
+            radio_nodo = 1
+
+        else:
+
+            painter.setBrush(QBrush(QColor("black")))
+            radio_nodo = 3
 
         #Recorro nuevamente toda la cuadricula
         for y in range(self.warehouse.height):
@@ -265,7 +391,7 @@ class Ventana(QWidget):
                     yp += self.escala // 2
 
                     #Dibujo el nodo del pasillo
-                    painter.drawEllipse(xp - 3, yp - 3, 6, 6)
+                    painter.drawEllipse(xp - radio_nodo, yp - radio_nodo, radio_nodo*2, radio_nodo*2)
 
 
         # ==================================================
@@ -289,11 +415,19 @@ class Ventana(QWidget):
                     #Solo dibujo el producto si todavia tiene stock
                     if producto.stock is None or producto.stock > 0:
 
-                        #Product.x y Product.y obtienen la posicion de su RackCell
                         xp, yp = self.coordenada_a_pixel(producto.x, producto.y)
-
-                        #Dibujo un cuadrado naranja para indicar que hay producto
-                        painter.drawRect(xp + self.escala - 12, yp + 4, 8, 8)
+                        
+                        #Tamaño de la caja
+                        tamano_producto = min(self.escala // 2, 18)
+                        
+                        #Dibujo la caja en la esquina de la celda
+                        painter.drawPixmap(
+                            xp + self.escala - tamano_producto,
+                            yp,
+                            tamano_producto,
+                            tamano_producto,
+                            self.imagen_producto
+                        )
 
                 actual_producto = actual_producto.nextNode
 
@@ -322,13 +456,24 @@ class Ventana(QWidget):
                 xp += self.escala // 2
                 yp += self.escala // 2
 
-                painter.setBrush(QBrush(QColor("blue")))
+                #Tamaño de la imagen del picker
+                tamano_picker = min(self.escala, 30)
 
-                #Dibujo el picker
-                painter.drawEllipse(xp - 10, yp - 10, 20, 20)
+                #Dibujo la imagen centrada en la celda
+                painter.drawPixmap(
+                    xp - tamano_picker // 2,
+                    yp - tamano_picker // 2,
+                    tamano_picker,
+                    tamano_picker,
+                    self.imagen_picker
+                )
 
                 #Muestro su id
-                painter.drawText(xp - 20, yp - 15, str(picker.id))
+                painter.drawText(
+                    xp - 20,
+                    yp - tamano_picker // 2 - 5,
+                    str(picker.id)
+                )
 
             actual_picker = actual_picker.nextNode
 
