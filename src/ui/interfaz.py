@@ -1,7 +1,7 @@
 import sys
 import math
 
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
@@ -45,7 +45,7 @@ class Ventana(QWidget):
         self.timer.timeout.connect(self.avanzar_simulacion)
 
         #Tiempo entre ticks
-        self.timer.setInterval(300)
+        self.timer.setInterval(1)
         
         
         # ==================================================
@@ -69,6 +69,84 @@ class Ventana(QWidget):
         self.boton_paso = QPushButton("Paso", self)
         self.boton_paso.setGeometry(210, 10, 80, 30)
         self.boton_paso.clicked.connect(self.paso)
+        
+        # ==================================================
+        # TICK ACTUAL
+        # ==================================================
+
+        self.label_tick = QLabel("Tick: 0", self)
+        self.label_tick.setGeometry(310, 10, 100, 30)
+        
+        # ==================================================
+        # PANEL DE EVENTOS
+        # ==================================================
+
+        self.panel_eventos = QTextEdit(self)
+
+        #No permito que el usuario escriba
+        self.panel_eventos.setReadOnly(True)
+
+        #Posicion y tamaño
+        self.panel_eventos.setGeometry(920, 60, 400, 550)
+
+        #Texto inicial
+        self.panel_eventos.setPlainText("Eventos de la simulacion:\n")
+        
+        # ==================================================
+        # ESTADO VISUAL DE LOS PICKERS
+        # ==================================================
+
+        self.estado_pickers = {}
+
+        actual_picker = self.warehouse.pickers.head
+
+        while actual_picker is not None:
+
+            picker = actual_picker.value
+
+            if picker is not None:
+                self.estado_pickers[picker.id] = "Libre"
+
+            actual_picker = actual_picker.nextNode
+
+    def formatear_evento(self, evento):
+
+        if evento.kind == "start":
+            accion = "inicio"
+
+        elif evento.kind == "pick":
+            accion = "recogio"
+
+        elif evento.kind == "drop":
+            accion = "descargo"
+
+        elif evento.kind == "wait":
+            accion = "espera"
+
+        elif evento.kind == "reroute":
+            accion = "recalculo su ruta"
+
+        elif evento.kind == "side_step":
+            accion = "cedio el paso"
+
+        elif evento.kind == "finish":
+            accion = "termino"
+
+        else:
+            accion = evento.kind
+
+        texto = (
+            "Tick " + str(evento.tick)
+            + " | "
+            + str(evento.picker)
+            + " "
+            + accion
+        )
+
+        if evento.detail != "":
+            texto += ": " + evento.detail
+
+        return texto
 
     def dibujar_sentido(self, painter, cell, x, y):
 
@@ -121,33 +199,26 @@ class Ventana(QWidget):
             cy + dy
         )
 
-    def dibujar_flecha(self, painter, x1, y1, x2, y2):
+    def dibujar_punta_flecha(self, painter, x1, y1, x2, y2):
 
-        #Dibujo la linea principal
-        painter.drawLine(x1, y1, x2, y2)
-
-        #Calculo el angulo de la arista
         angulo = math.atan2(y2 - y1, x2 - x1)
 
-        #Tamaño de la punta de la flecha
-        tamano_flecha = max(2, min(6, self.escala // 3))
+        tamano = max(2, min(6, self.escala // 3))
 
-        #No pongo la punta exactamente sobre el nodo destino.
-        #La dejo un poco antes para que se vea mejor.
+        #La punta queda un poco antes del nodo destino
         distancia_destino = max(2, self.escala // 4)
 
         punta_x = x2 - math.cos(angulo) * distancia_destino
         punta_y = y2 - math.sin(angulo) * distancia_destino
 
-        #Dos lineas que forman la punta
         angulo1 = angulo + math.radians(150)
         angulo2 = angulo - math.radians(150)
 
-        x3 = punta_x + math.cos(angulo1) * tamano_flecha
-        y3 = punta_y + math.sin(angulo1) * tamano_flecha
+        x3 = punta_x + math.cos(angulo1) * tamano
+        y3 = punta_y + math.sin(angulo1) * tamano
 
-        x4 = punta_x + math.cos(angulo2) * tamano_flecha
-        y4 = punta_y + math.sin(angulo2) * tamano_flecha
+        x4 = punta_x + math.cos(angulo2) * tamano
+        y4 = punta_y + math.sin(angulo2) * tamano
 
         painter.drawLine(
             int(punta_x),
@@ -209,6 +280,55 @@ class Ventana(QWidget):
 
         return xp, yp
 
+    def actualizar_estado_pickers(self, eventos):
+
+        #Primero establezco un estado base para todos los pickers
+        actual_picker = self.warehouse.pickers.head
+
+        while actual_picker is not None:
+
+            picker = actual_picker.value
+
+            if picker is not None:
+
+                #Si no tiene assignment actualmente esta libre
+                if picker.assignment is None:
+                    self.estado_pickers[picker.id] = "Libre"
+
+                else:
+                    self.estado_pickers[picker.id] = "En proceso"
+
+            actual_picker = actual_picker.nextNode
+
+
+        #Despues uso los eventos del tick para poner un estado mas preciso
+        for evento in eventos:
+
+            if evento.kind == "start":
+                self.estado_pickers[evento.picker] = "Iniciando"
+
+            elif evento.kind == "move":
+                self.estado_pickers[evento.picker] = "Moviendose"
+
+            elif evento.kind == "wait":
+                self.estado_pickers[evento.picker] = "Esperando"
+
+            elif evento.kind == "pick":
+                self.estado_pickers[evento.picker] = "Recogiendo"
+
+            elif evento.kind == "drop":
+                self.estado_pickers[evento.picker] = "Descargando"
+
+            elif evento.kind == "reroute":
+                self.estado_pickers[evento.picker] = "Recalculando ruta"
+
+            elif evento.kind == "side_step":
+                self.estado_pickers[evento.picker] = "Cediendo paso"
+
+            elif evento.kind == "finish":
+                self.estado_pickers[evento.picker] = "Terminado"
+
+
 
     def avanzar_simulacion(self):
 
@@ -217,30 +337,96 @@ class Ventana(QWidget):
 
             self.timer.stop()
 
-            print("Simulacion terminada")
-            print(self.simulation.summary())
+            self.panel_eventos.append("")
+            self.panel_eventos.append("=== SIMULACION TERMINADA ===")
+
+            resumen = self.simulation.summary()
+
+            self.panel_eventos.append(
+                "Ticks: " + str(resumen["ticks"])
+            )
+
+            self.panel_eventos.append(
+                "Distancia planeada: " + str(resumen["planned_distance"])
+            )
+
+            self.panel_eventos.append(
+                "Pasos realizados: " + str(resumen["steps"])
+            )
+
+            self.panel_eventos.append(
+                "Esperas: " + str(resumen["waits"])
+            )
+
+            self.panel_eventos.append(
+                "Reenrutamientos: " + str(resumen["reroutes"])
+            )
 
             return
 
 
         #Ejecuto un solo tick
         eventos = self.simulation.step()
+        
+        self.actualizar_estado_pickers(eventos)
+        
+        #Actualizo el tick mostrado en pantalla
+        self.label_tick.setText(
+            "Tick: " + str(self.simulation.tick)
+        )
 
         #Muestro por consola los eventos importantes
         for evento in eventos:
 
             if evento.kind != "move":
 
-                print(evento.describe(self.warehouse))
+                texto_evento = self.formatear_evento(evento)
+                print(texto_evento)
+                self.panel_eventos.append(texto_evento)
 
-
+        #Bajo automaticamente al ultimo evento
+        scrollbar = self.panel_eventos.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        
         #Le digo a PyQt que vuelva a dibujar la ventana
         self.update()
 
+    def dibujar_leyenda_sentidos(self, painter):
+
+        x = 420
+        y = 30
+
+        sentidos = [
+            ("Norte", QColor("blue")),
+            ("Sur", QColor("red")),
+            ("Este", QColor("green")),
+            ("Oeste", QColor("orange")),
+            ("Ambos", QColor("black"))
+        ]
+
+        for nombre, color in sentidos:
+
+            #Linea de ejemplo
+            painter.setPen(QPen(color, 3))
+            painter.drawLine(x, y, x + 20, y)
+
+            #Texto
+            painter.setPen(QPen(QColor("black"), 1))
+            painter.drawText(
+                x + 25,
+                y + 5,
+                nombre
+            )
+
+            #Muevo la siguiente referencia hacia la derecha
+            x += 90
 
     def paintEvent(self, event):
 
         painter = QPainter(self)
+        
+        #Dibujo la leyenda de sentidos
+        self.dibujar_leyenda_sentidos(painter)
 
         #Calculo nuevamente la escala cada vez que se dibuja la ventana
         self.escala = self.calcular_escala()
@@ -310,52 +496,92 @@ class Ventana(QWidget):
         # ARISTAS DEL GRAFO
         # ==================================================
 
-        if self.escala < 15:
-            color_arista = QColor(190, 190, 190)
-            grosor_arista = 1
-
-        else:
-            color_arista = QColor("black")
-            grosor_arista = 2
-
-        painter.setPen(QPen(color_arista, grosor_arista))
-
-        #Empiezo desde la primera arista
         actual = self.warehouse.graph.e.head
 
         while actual is not None:
 
-            #Cada arista tiene nodo origen, nodo destino y peso
             origen_id, destino_id, peso = actual.value
 
-            #Paso el id de cada nodo a coordenadas (x,y)
             origen_x, origen_y = self.warehouse.node_xy(origen_id)
             destino_x, destino_y = self.warehouse.node_xy(destino_id)
 
-            #Paso las coordenadas del warehouse a la pantalla
             x1, y1 = self.coordenada_a_pixel(origen_x, origen_y)
             x2, y2 = self.coordenada_a_pixel(destino_x, destino_y)
 
-            #Busco el centro de las dos celdas
+            #Centro de ambas celdas
             x1 += self.escala // 2
             y1 += self.escala // 2
 
             x2 += self.escala // 2
             y2 += self.escala // 2
 
-            #Dibujo la arista
-            painter.drawLine(x1, y1, x2, y2)
-            
-            #Dibujo la arista dirigida
-            #self.dibujar_flecha(
-            #    painter,
-            #    x1,
-            #    y1,
-            #    x2,
-            #    y2
-            #)
 
-            #Paso a la siguiente arista
+            #Obtengo la celda desde donde sale la arista
+            cell_origen = self.warehouse.floor.cell_at(origen_x, origen_y)
+
+            sentido = cell_origen.sentido
+
+
+            #El color representa el sentido declarado del pasillo
+            if sentido == N:
+                color_arista = QColor("blue")
+
+            elif sentido == S:
+                color_arista = QColor("red")
+
+            elif sentido == E:
+                color_arista = QColor("green")
+
+            elif sentido == O:
+                color_arista = QColor("orange")
+
+            else:
+                #AMBOS o pasillo no declarado
+                if self.escala < 15:
+                    color_arista = QColor(180, 180, 180)
+                else:
+                    color_arista = QColor("black")
+
+
+            if self.escala < 15:
+                grosor_arista = 1
+            else:
+                grosor_arista = 2
+
+            painter.setPen(QPen(color_arista, grosor_arista))
+
+
+            #Dibujo siempre la arista
+            painter.drawLine(x1, y1, x2, y2)
+
+
+            #Dibujo flecha solamente si esta arista coincide
+            #con el sentido declarado del pasillo
+            dibujar_flecha = False
+
+            if sentido == N and destino_y > origen_y:
+                dibujar_flecha = True
+
+            elif sentido == S and destino_y < origen_y:
+                dibujar_flecha = True
+
+            elif sentido == E and destino_x > origen_x:
+                dibujar_flecha = True
+
+            elif sentido == O and destino_x < origen_x:
+                dibujar_flecha = True
+
+
+            if dibujar_flecha:
+                self.dibujar_punta_flecha(
+                    painter,
+                    x1,
+                    y1,
+                    x2,
+                    y2
+                )
+
+
             actual = actual.nextNode
 
 
@@ -398,7 +624,7 @@ class Ventana(QWidget):
         # PRODUCTOS
         # ==================================================
 
-        painter.setBrush(QBrush(QColor("orange")))
+        #painter.setBrush(QBrush(QColor("orange")))
 
         #Recorro el diccionario de productos
         for bucket in self.warehouse.products.dictionary:
@@ -419,11 +645,11 @@ class Ventana(QWidget):
                         
                         #Tamaño de la caja
                         tamano_producto = min(self.escala // 2, 18)
-                        
-                        #Dibujo la caja en la esquina de la celda
+
+                        #Dibujo la imagen del producto centrada en la celda
                         painter.drawPixmap(
-                            xp + self.escala - tamano_producto,
-                            yp,
+                            xp + (self.escala - tamano_producto) // 2,
+                            yp + (self.escala - tamano_producto) // 2,
                             tamano_producto,
                             tamano_producto,
                             self.imagen_producto
@@ -467,6 +693,9 @@ class Ventana(QWidget):
                     tamano_picker,
                     self.imagen_picker
                 )
+                
+                #Dibujo de color negro el id del picker
+                painter.setPen(QPen(QColor("black"), 1))
 
                 #Muestro su id
                 painter.drawText(
@@ -474,6 +703,45 @@ class Ventana(QWidget):
                     yp - tamano_picker // 2 - 5,
                     str(picker.id)
                 )
+                
+                #Obtengo el estado actual del picker
+                estado = self.estado_pickers.get(picker.id, "Libre")
+
+                #Muestro el estado debajo del picker
+                painter.setPen(QPen(QColor("black"), 2))
+
+                painter.drawText(
+                    xp - 30,
+                    yp + tamano_picker // 2 + 12,
+                    estado
+                )
+                
+                """#Estado actual
+                estado = self.estado_pickers.get(picker.id, "Libre")
+
+                #Posicion del texto
+                texto_x = xp - 35
+                texto_y = yp + tamano_picker // 2 + 14
+
+                #Fondo blanco para que las aristas no molesten
+                painter.setPen(QPen(QColor("black"), 1))
+                painter.setBrush(QBrush(QColor(255, 255, 255)))
+
+                painter.drawRect(
+                    texto_x - 2,
+                    texto_y - 12,
+                    75,
+                    16
+                )
+
+                #Texto del estado
+                painter.setPen(QPen(QColor("black"), 1))
+
+                painter.drawText(
+                    texto_x,
+                    texto_y,
+                    estado
+                )"""
 
             actual_picker = actual_picker.nextNode
 
@@ -481,7 +749,7 @@ class Ventana(QWidget):
 app = QApplication(sys.argv)
 
 #Cargo el escenario
-config = load_config("src/data/escenario_basico.json")
+config = load_config("src/data/escenario_grande.json")
 
 #Construyo el warehouse
 warehouse = build_warehouse(config)
@@ -495,7 +763,7 @@ waves, rejected = WaveBuilder(
 #Creo la simulacion
 simulation = Simulation(
     warehouse,
-    algorithm="bfs",
+    algorithm="astar",
     auto_assign=True
 )
 

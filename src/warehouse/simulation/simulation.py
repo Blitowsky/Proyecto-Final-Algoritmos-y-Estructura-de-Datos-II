@@ -260,7 +260,7 @@ class Simulation:
             item = leg.items.head
             while item is not None:
                 if item.value is not None:
-                    parts.append(f"{item.value.product.id} x{item.value.qty}")
+                    parts.append(f"{item.value.product.id} ({item.value.product.name}) x{item.value.qty}")
                 item = item.nextNode
             out.append(Event(
                 self.tick,
