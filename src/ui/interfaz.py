@@ -86,8 +86,10 @@ class Ventana(QWidget):
         #No permito que el usuario escriba
         self.panel_eventos.setReadOnly(True)
 
-        #Posicion y tamaño
-        self.panel_eventos.setGeometry(920, 60, 400, 550)
+        #Espacio reservado para el panel de eventos
+        self.ancho_panel = 400
+        self.separacion_panel = 30
+        self.margen_derecho = 30
 
         #Texto inicial
         self.panel_eventos.setPlainText("Eventos de la simulacion:\n")
@@ -258,17 +260,40 @@ class Ventana(QWidget):
 
     def calcular_escala(self):
 
-        #Espacio disponible para dibujar dentro de la ventana
-        ancho_disponible = self.width() - 2 * self.margen
+        #Al ancho de la ventana le resto el espacio
+        #que necesita el panel de eventos
+        ancho_disponible = (
+            self.width()
+            - self.margen
+            - self.ancho_panel
+            - self.separacion_panel
+            - self.margen_derecho
+        )
+
         alto_disponible = self.height() - 2 * self.margen
 
-        #Calculo cuanto puede medir cada celda
         escala_x = ancho_disponible // self.warehouse.width
         escala_y = alto_disponible // self.warehouse.height
 
-        #Uso la escala mas chica para asegurarme de que entre todo
         return max(1, min(escala_x, escala_y))
 
+    def resizeEvent(self, event):
+
+        #Coloco el panel siempre contra el lado derecho
+        x_panel = (
+            self.width()
+            - self.ancho_panel
+            - self.margen_derecho
+        )
+
+        self.panel_eventos.setGeometry(
+            x_panel,
+            60,
+            self.ancho_panel,
+            self.height() - 100
+        )
+
+        super().resizeEvent(event)
 
     def coordenada_a_pixel(self, x, y):
 
