@@ -3,6 +3,9 @@ from warehouse.structures.dictionary import Dictionary, search, insert
 
 from warehouse.domain.product import Product
 from warehouse.domain.order import Order
+from warehouse.domain.location import DispatchZone
+# from warehouse.domain.picker import Picker
+from warehouse.domain.route import Route
 
 class WaveConfig:
     def __init__(self, max_orders: int, max_products: int) -> None:
@@ -36,6 +39,10 @@ class Wave:
         self.total_weight: float = 0.0
         self.top_priority: int = 0
 
+        self.status: str = "created"
+        self.assignments: LinkedList = LinkedList()
+        self.assignment_count: int = 0
+
     def why_not(self, order: Order) -> str|None:
         if order.state != "PENDIENTE":
             return f"El pedido {order.id} está {order.state}, solo se pueden añadir pedidos en PENDIENTE a una nueva wave."
@@ -45,8 +52,14 @@ class Wave:
         new_products = 0
         line = order.lines.head
         while line is not None:
-            if line.value and search(self.line_index, line.value.product.id) is None:
+            if line.value is None:
+                line = line.nextNode
+                continue
+            if search(self.line_index, line.value.product.id) is None:
                 new_products += 1
+            available = line.value.product.available
+            if available is not None and line.value.qty > available:
+                return f"El pedido {order.id} pide {line.value.qty} {line.value.product.id}, pero solo quedan {available} sin reservar."
             line = line.nextNode
 
         if self.product_count + new_products > self.config.max_products:
@@ -87,6 +100,42 @@ class Wave:
             self.top_priority = order.priority
         order.assign_to(self)
 
+    def release_stock(self) -> None:
+        line = self.lines.head
+        while line is not None:
+            if line.value is None:
+                line = line.nextNode
+                continue
+            line.value.product.release(line.value.qty)
+
+class Assignment:
+    def __init__(
+        self, 
+        wave: Wave, 
+        picker, 
+        zone: DispatchZone,
+        shares: LinkedList,
+        stops: LinkedList
+    ) -> None:
+        self.wave: Wave = wave
+        self.picker = picker
+        self.zone: DispatchZone = zone
+        self.shares: LinkedList = shares
+        self.stops: LinkedList = stops
+        self.weight: float = 0.0
+        self.units: int = 0
+
+        line = shares.head
+        while line is not None:
+            if line.value is None:
+                line = line.nextNode
+                continue
+            self.weight += line.value.product.weight * line.value.qty
+            self.units += line.value.qty
+            line = line.nextNode
+
+        self.route: Route|None = None
+        self.status: str = "assigned"
 
 
 

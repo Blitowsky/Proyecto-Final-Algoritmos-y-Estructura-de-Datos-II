@@ -41,6 +41,7 @@ class DispatchZone:
         self.access: LinkedList = LinkedList()
         self.items: LinkedList = LinkedList()
         self.load: float = 0.0
+        self.reserved: float = 0.0
 
     @property
     def is_outbound(self) -> bool:
@@ -48,6 +49,17 @@ class DispatchZone:
 
     def can_accept(self, weight: float) -> bool:
         return self.load + weight <= self.max_weight + EPS
+
+    def can_reserve(self, weight: float) -> bool:
+        return self.load + self.reserved + weight <= self.max_weight + EPS
+
+    def reserve(self, weight: float) -> None:
+        if not self.can_reserve(weight):
+            raise ValueError(f"La zona de despacho {self.id} no puede reservar {weight}kg.")
+        self.reserved += weight
+
+    def release(self, weight: float) -> None:
+        self.reserved = max(0.0, self.reserved - weight)
     
     def deposit(self, items: LinkedList, weight: float) -> None:
         if not self.can_accept(weight):
@@ -65,3 +77,4 @@ class DispatchZone:
     def reset(self):
         self.items = LinkedList()
         self.load = 0.0
+        self.reserved = 0.0

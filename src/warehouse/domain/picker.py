@@ -1,8 +1,9 @@
-from warehouse.domain.product import Product
-from warehouse.domain.warehouse import Floor, WareHouse
-
 from warehouse.structures.dictionary import search
 from warehouse.structures.linkedlist import LinkedList, add
+
+from warehouse.domain.product import Product
+# from warehouse.domain.warehouse import WareHouse
+from warehouse.domain.wave import Assignment
 
 # Por errores de punto flotante
 EPS = 1e-9
@@ -28,6 +29,7 @@ class Picker:
         self.delivered: LinkedList = LinkedList()
 
         self.distance: int = 0
+        self.assignment: Assignment|None = None
 
     @property
     def nodes_visited(self) -> int:
@@ -39,7 +41,7 @@ class Picker:
     def fits(self, extra_weight: float) -> bool:
         return self.load + extra_weight <= self.capacity + EPS
 
-    def move_to(self, next_id: int, warehouse: WareHouse) -> float:
+    def move_to(self, next_id: int, warehouse) -> float:
         graph = warehouse.graph.graph
 
         if search(graph, self.node) is None:
@@ -88,7 +90,7 @@ class Picker:
         return item
 
 
-    def drop_off(self, warehouse: WareHouse) -> LinkedList:
+    def drop_off(self, warehouse) -> LinkedList:
         zones = warehouse.dropoff_zones_at(self.node)
 
         if zones is None:
@@ -143,4 +145,5 @@ class Picker:
         self.carried = LinkedList()
         self.delivered = LinkedList()
         self.distance = 0
+        self.assignment = None
             

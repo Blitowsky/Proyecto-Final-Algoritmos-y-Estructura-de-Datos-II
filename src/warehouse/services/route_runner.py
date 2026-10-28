@@ -122,18 +122,21 @@ def run_route(picker: Picker, warehouse: WareHouse, route: Route) -> Route:
             leg = leg.nextNode
             continue
         _walk(picker, warehouse, leg.value)
-        if leg.value.kind == "pick":
-            line = leg.value.stop.picks.head
-            while line is not None:
-                if line.value is None:
-                    line = line.nextNode
-                    continue
-                add(leg.value.items, picker.pick(line.value.product, line.value.qty))
-                line = line.nextNode
-        elif leg.value.kind == "return":
-            leg.value.items = picker.drop_off(warehouse)
+        perform_leg_action(picker, warehouse, leg.value)
         leg = leg.nextNode
     return route
+
+def perform_leg_action(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
+    if leg.kind == "pick" and leg.stop is not None:
+        line = leg.stop.picks.head
+        while line is not None:
+            if line.value is None:
+                line = line.nextNode
+                continue
+            add(leg.items, picker.pick(line.value.product, line.value.qty))
+            line = line.nextNode
+    elif leg.kind == "return":
+        leg.items = picker.drop_off(warehouse)
 
 def visit(
     picker: Picker,
