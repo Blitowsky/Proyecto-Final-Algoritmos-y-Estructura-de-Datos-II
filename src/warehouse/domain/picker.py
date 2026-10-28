@@ -1,8 +1,21 @@
+"""
+Picker: el operario que camina por los pasillos y recoge productos.
+
+DISEÑO
+-----------
+Un Picker no decide adónde ir. Solo sabe hacer cuatro cosas: 
+avanzar un paso a lo largo de una arista, recoger un producto,
+dejar todo en una zona de despacho y reiniciarse. 
+
+La decisión de la ruta corresponde al algoritmo de búsqueda de caminos (pathfinding), 
+mientras que la decisión de qué recoger corresponde a la lógica de la wave. Cada operación
+primitiva equivale exactamente a un paso de la simulación.
+"""
+
 from warehouse.structures.dictionary import search
 from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.product import Product
-# from warehouse.domain.warehouse import WareHouse
 from warehouse.domain.wave import Assignment
 
 # Por errores de punto flotante

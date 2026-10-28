@@ -1,3 +1,13 @@
+"""
+Product: cada producto, con stock y ubicación asignadas.
+
+DISEÑO
+----------
+Cada producto apunta a la celda de `Rack` en la que se encuentra (`product.cell`).
+A su vez, `product.half.access` contiene la lista de nodos en los que el picker 
+puede situarse para recogerlo.
+"""
+
 from warehouse.structures.linkedlist import LinkedList
 
 from warehouse.domain.rack import Rack, RackCell
@@ -42,4 +52,6 @@ class Product:
 
     @property
     def pick_cells(self) -> LinkedList:
+        """`LinkedList` con IDs de pasillos (vértices del grafo)
+        desde los que un picker puede acceder a este producto."""
         return self.cell.access

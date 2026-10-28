@@ -1,3 +1,16 @@
+"""
+Order: un pedido con uno o más productos, cada uno
+con una cantidad requerida, más prioridad y estado.
+
+DISEÑO
+----------
+El pedido valida sus propias líneas (cantidad, stock y duplicados).
+
+Los totales (unidades, peso y número de líneas) se mantienen actualizados 
+a medida que se agregan líneas, por lo que la generación de oleadas puede
+consultarlos en O(1), sin tener que recorrer las líneas nuevamente.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.product import Product

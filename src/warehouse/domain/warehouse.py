@@ -1,3 +1,10 @@
+"""
+Floor: plan de piso del warehouse, con ubicaciones de cosas fijas.
+WareHouse: `Floor` más estados de waves, pedidos, pickers, etc.
+
+
+"""
+
 from warehouse.structures.linkedlist import LinkedList
 from warehouse.structures.dictionary import Dictionary, search
 from warehouse.structures.graph import WeightedDirectedGraph

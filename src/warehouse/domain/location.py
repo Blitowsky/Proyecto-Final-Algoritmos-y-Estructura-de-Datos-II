@@ -1,3 +1,17 @@
+"""
+Ubicaciones simples: 
+- `HallSection` (pasillo)
+- `Door` (puerta)
+
+Zonas de Despacho:
+
+El rectángulo debe tocar una pared (borde exterior del suelo), 
+no debe contener ningun rack ni superponerse con otra zona.
+
+zone.access es la lista de identificadores de los pasillos que
+se encuentran al borde de la zona.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.rack import Rack
@@ -11,12 +25,15 @@ DOOR_KINDS = (INBOUND, OUTBOUND, AMBOS)
 EPS = 1e-9
 
 class HallSection:
+    """Una entrada para los pasillo: 
+    un rectángulo de pasillos que comparten sentido."""
     def __init__(self, section_id: str, rect: Rect, sentido: str):
         self.id: str = section_id
         self.rect: Rect = rect
         self.sentido: str = sentido
 
 class Door:
+    """Una celda individual al borde del warehouse."""
     def __init__(self, door_id: str, kind: str, x: int, y: int) -> None:
         if kind not in DOOR_KINDS:
             raise ValueError(f"La puerta {door_id} tiene tipo {kind}, se esperaba uno de {", ".join(DOOR_KINDS)}.")
@@ -45,6 +62,7 @@ class DispatchZone:
 
     @property
     def is_outbound(self) -> bool:
+        """`True` si se puede despachar en esta zona."""
         return self.door is not None and self.door.is_outbound
 
     def can_accept(self, weight: float) -> bool:
