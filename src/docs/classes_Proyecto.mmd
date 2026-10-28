@@ -1,0 +1,344 @@
+classDiagram
+  class Cell {
+    declared : bool
+    kind : str
+    owner : NoneType
+    sentido : str | None
+    label() str
+  }
+  class Dictionary {
+    dictionary
+    m : int
+    hash_func(value) int
+    printDict() None
+  }
+  class DisjointSet {
+    parent
+    rank
+    find_set(v)
+    union(x, y)
+  }
+  class DispatchZone {
+    access
+    door : Door | None
+    door_id : str
+    id : str
+    is_outbound : bool
+    items
+    load : float
+    max_weight : float
+    rect
+    reserved : float
+    can_accept(weight: float) bool
+    can_reserve(weight: float) bool
+    deposit(items: LinkedList, weight: float) None
+    release(weight: float) None
+    reserve(weight: float) None
+    reset()
+  }
+  class Door {
+    id : str
+    is_outbound : bool
+    kind : str
+    x : int
+    y : int
+    zones
+  }
+  class Event {
+    detail : str
+    dst : int | None
+    kind : str
+    picker : str
+    src : int
+    tick : int
+    describe(warehouse: WareHouse) str
+  }
+  class Floor {
+    doors
+    doors_by_id
+    dropoff
+    grid
+    hall_count : int
+    height : int
+    rack_cells
+    racks
+    racks_by_id
+    sections
+    sections_by_id
+    width : int
+    zones
+    zones_by_id
+    cell_at(x: int, y: int) Cell | None
+    cell_id(x: int, y: int) int
+    in_bounds(x: int, y: int) bool
+  }
+  class Graph {
+    e
+    graph
+    m : int | None
+    v
+    createGraph() Dictionary
+    printGraph() None
+  }
+  class HallSection {
+    id : str
+    rect
+    sentido : str
+  }
+  class Leg {
+    distance : float
+    edges : int
+    end : int | None
+    items
+    kind : str
+    nodes : int
+    path
+    start : int | None
+    stop : Stop | None
+  }
+  class LinkedList {
+    head : Node | None
+    tail : Node | None
+    print_list()
+  }
+  class MinQueue {
+    is_empty() bool
+    pop() tuple
+    push(priority: int, item) None
+  }
+  class Move {
+    blocker : str | None
+    dst : int
+    granted : bool
+    picker : str
+    rank : tuple[int, int, str]
+    reason : str | None
+    src : int
+  }
+  class Node {
+    nextNode : Node | None
+    value : NoneType
+  }
+  class Order {
+    id : str
+    line_count : int
+    lines
+    priority : int
+    state : str
+    total_units : int
+    total_weight : float
+    wave : NoneType
+    add_line(product: Product, qty: int) None
+    assign_to(wave) None
+    finish() None
+    reset()
+    start_preparation() None
+  }
+  class OrderLine {
+    product
+    qty : int
+    weight : float
+  }
+  class PickLine {
+    product
+    qty : int
+  }
+  class PickedItem {
+    product
+    qty : int
+    weight
+  }
+  class Picker {
+    assignment : Assignment | None, NoneType
+    capacity : float
+    carried
+    delivered
+    distance : int
+    id : str
+    load : float
+    node : int
+    nodes_visited : int
+    start_node : int
+    drop_off(warehouse) LinkedList
+    fits(extra_weight: float) bool
+    is_at_access_hall(product: Product) bool
+    move_to(next_id: int, warehouse) float
+    pick(product: Product, qty: int) PickedItem
+    remaining() float
+    reset() None
+  }
+  class Product {
+    available : int | None
+    cell
+    id
+    location : tuple[int, int, int]
+    name : str
+    pick_cells : LinkedList
+    rack : Rack
+    reserved : int
+    stock : int
+    weight : float
+    x : int
+    y : int
+    z : int
+    release(qty: int) None
+    reserve(qty: int) None
+  }
+  class Rack {
+    cells
+    id : str
+    rect
+  }
+  class RackCell {
+    access
+    id : int
+    items
+    rack
+    x : int
+    y : int
+  }
+  class Record {
+    end_tick : int
+    picker : str
+    planned_distance : float
+    reroutes : int
+    side_steps : int
+    start_tick : int
+    steps : int
+    ticks : int
+    waits : int
+    wave : str
+  }
+  class Rect {
+    height : int
+    width : int
+    x : int
+    x2 : int
+    y : int
+    y2 : int
+    contains(x: int, y: int) bool
+    inside(floor_width: int, floor_height: int) bool
+    touches(x: int, y: int) bool
+  }
+  class Rejection {
+    order
+    reason : str
+  }
+  class Route {
+    distance : float
+    edges : int
+    end : int
+    executed : bool
+    leg_count : int
+    legs
+    nodes : int
+    start : int
+    zone
+    add(leg: Leg) None
+    distinct_nodes(table_size: int) int
+  }
+  class SearchResult {
+    distance : float
+    edges : int
+    examined : int
+    expanded : int
+    nodes : int
+    path
+    source
+    target
+  }
+  class Simulation {
+    algorithm : str
+    auto_assign : bool
+    events : list[Event]
+    finished : bool
+    max_ticks : int
+    patience : int
+    records : list[Record]
+    stop_orderer : NoneType
+    tick : int
+    walkers : list[Walker]
+    warehouse
+    run() list[Event]
+    step() list[Event]
+    summary() dict
+  }
+  class Stop {
+    cells
+    picks
+    units : int
+    weight : float
+    for_product(product: Product, qty: int)
+  }
+  class Walker {
+    actions : int
+    algorithm : str
+    assignment
+    distance_at_start : int
+    done : bool
+    index : int
+    leg : Leg | None, NoneType
+    leg_index : int
+    legs : list[Leg]
+    moves : int
+    path : list[int]
+    picker
+    remaining_steps : int
+    replans : int
+    reroutes : int
+    side_steps : int
+    start_tick : int | None
+    waited : int
+    waiting_for : NoneType, str | None
+    waits : int
+    warehouse
+    act() Leg | None
+    goal_cells() LinkedList | None
+    peek() tuple[str, int | None]
+    refused(blocker: str | None) None
+    reroute(path: list[int]) None
+    step_to(cell: int) None
+  }
+  class WareHouse {
+    doors
+    floor
+    graph
+    height : int
+    orders
+    orders_by_id
+    pickers
+    products
+    racks
+    wave_config
+    waves
+    width : int
+    zones
+    dropoff_zones_at(node_id: int) LinkedList | None
+    node_xy(node_id: int) tuple[int, int]
+  }
+  class WaveBuilder {
+    created : int
+    id_prefix : str
+    pickers
+    selector : NoneType
+    warehouse
+    build() tuple[LinkedList, LinkedList]
+  }
+  class WeightedDirectedGraph {
+    e
+    graph
+    m : int | None
+    v
+    createWeightedDirectedGraph() Dictionary
+  }
+  class WeightedGraph {
+    e
+    graph
+    v
+    createWeightedGraph() Dictionary
+  }
+  WeightedDirectedGraph --|> Graph
+  WeightedGraph --|> Graph
+  Simulation --> Record : records
+  Rack --o RackCell : rack
+  Floor --o WareHouse : floor

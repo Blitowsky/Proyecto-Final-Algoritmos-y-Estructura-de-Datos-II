@@ -1,7 +1,20 @@
 from warehouse.structures.graph import WeightedDirectedGraph
 from warehouse.structures.linkedlist import LinkedList, add
 
-def neighbors(graph: WeightedDirectedGraph, vertex) -> LinkedList:
+def neighbors(graph: WeightedDirectedGraph, vertex: int) -> LinkedList:
+    """Nodos conectados a `vertex` a través de una arista.
+
+    Parámetros
+    ----------
+    graph (`WeightedDirectedGraph`):
+        Grafo sobre el cual se está trabjando.
+    vertex (`int`):
+        ID del vértice del que se quieren saber los vecinos.
+
+    Retorna
+    ----------
+    LinkedList con IDs de los nodos vecinos.
+    """
     table = graph.graph
     bucket = table.dictionary[table.hash_func(vertex)]
     result = LinkedList()

@@ -9,6 +9,19 @@ from warehouse.domain.warehouse import WareHouse
 from warehouse.algorithms.graph_queries import neighbors
 
 class SearchResult:
+    """Resultado de una búsqueda, más métricas de valor.
+
+    Parámetros
+    ----------
+    path (`LinkedList`):
+        Lista con IDs de los nodos del camino encontrado, en orden
+    distance (`float`):
+        Suma de pesos de las aristas en el camino encontrado.
+    expanded (`int`):
+        Cantidad de nodos expandidos durante la búsqueda.
+    examined (`int`):
+        Cantidad de nodos examinados durante la búsqueda.
+    """
     def __init__(self, path: LinkedList, distance: float, expanded: int, examined: int) -> None:
         self.path: LinkedList = path
         self.nodes: int = 0
@@ -32,11 +45,33 @@ class SearchResult:
 
 
 def _table_size(graph: WeightedDirectedGraph) -> int:
+    """Tamaño total del warehouse.
+
+    Parámetros
+    ----------
+    graph (`WeightedDirectedGraph`):
+        Grafo que representa los pasillos del warehouse.
+
+    Retorna
+    ----------
+        Un `int` representando el ancho * alto del warehouse.
+    """
     if graph.m is None:
         raise ValueError("El grafo debe estar construido con m = ancho * alto.")
     return graph.m
 
 def _target_ids(targets: LinkedList|int) -> list[int]:
+    """Convierte una `LinkedList` o `int` en una lista de objetivos.
+
+    Parámetros
+    ----------
+        targets (`LinkedList`|`int`):
+            Lista de objetivos, u objetivo individual.
+
+    Retorna
+    ----------
+        Una lista de enteros, donde cada uno es el ID del objetivo.
+    """
     if isinstance(targets, int):
         return [targets]
     ids = []
@@ -49,12 +84,40 @@ def _target_ids(targets: LinkedList|int) -> list[int]:
     return ids
 
 def _target_set(ids: list[int], size: int) -> Dictionary:
+    """Guarda los objetivos como vistos en una hash table.
+
+    Parámetros
+    ----------
+        ids (`list[int]`):
+            Lista de objetivos.
+        size (`int`):
+            Tamaño del warehouse.
+
+    Retorna
+    ----------
+        Un diccionario, con valores `True` con los objetivos como keys.
+    """
     found = Dictionary(size)
     for target in ids:
         insert(found, True, target)
     return found
 
 def _build_path(parent: Dictionary, source: int, last: int) -> LinkedList:
+    """Convierte un diccionario de padres en una lista con el recorrido
+
+    Parámetros
+    ----------
+        parent (`Dictionary`):
+            Hash table con (ID nodo) -> (padre).
+        source (`int`):
+            ID del nodo al principio del camino.
+        last (`int`):
+            ID del nodo al final del camino.
+
+    Retorna
+    ----------
+        LinkedList con los IDs del camino en orden.
+    """
     reversed_nodes = [last]
     node = last
     while node != source:
@@ -67,11 +130,36 @@ def _build_path(parent: Dictionary, source: int, last: int) -> LinkedList:
     return path
 
 def _single_node_result(source: int) -> SearchResult:
+    """Genera un resultado de búsqueda, donde el resultado es un solo nodo.
+
+    Parámetros
+    ----------
+        source (`int`):
+            ID del único nodo del recorrido.
+
+    Retorna
+    ----------
+        `SearchResult` con un nodo como `path`.
+    """
     path = LinkedList()
     add(path, source)
     return SearchResult(path, 0, 0, 0)
 
 def _is_blocked(blocked: Dictionary|None, node: int) -> bool:
+    """Revisa si el nodo `node` está bloqueado por alguien.
+
+    Parámetros
+    ----------
+        blocked (`Dictionary`|`None`):
+            Hash table del warehouse donde (ID nodo) -> (`bool`)
+            si está bloqueado o no.
+        node (`int`):
+            ID del nodo a revisar
+
+    Retorna
+    ----------
+        El valor del diccionario en la posición `node`.
+    """
     return blocked is not None and search(blocked, node) is not None
 
 
@@ -291,6 +379,32 @@ def find_path(
     blocked: Dictionary|None = None,
     trace: LinkedList|None = None
 ) -> SearchResult|None:
+    """
+    Realiza la búsqueda en el grafo mediante el
+    algoritmo `algorithm`, y termina en el PRIMER 
+    nodo que se encuentre en los objetivos.
+
+    Parámetros
+    ----------
+        graph (`WeightedDirectedGraph`):
+            Grafo a recorrer.
+        source (`int`):
+            ID del nodo raíz.
+        targets (`LinkedList`):
+            Lista de objetivos a encontrar.
+        blocked (`Dictionary`|`None`):
+            Hash table de nodos bloqueados
+            (ID nodo) -> (`bool`).
+        trace (`LinkedList`|`None`):
+            Lista de nodos recorridos
+            (fines para renderizado).
+
+    Retorna
+    ----------
+        Un resultado de búsqueda `SearchResult`
+        si se encuentra un camino, `None` en
+        caso contrario.
+    """
     match algorithm:
         case "bfs":
             return bfs_path(warehouse.graph, source, targets, blocked, trace)
