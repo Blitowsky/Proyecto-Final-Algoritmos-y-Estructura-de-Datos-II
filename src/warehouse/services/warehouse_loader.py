@@ -61,7 +61,7 @@ def build_warehouse(config: dict) -> WareHouse:
 
     products = load_products(config, floor)
     pickers = load_pickers(config, floor)
-    orders, orders_by_id = add_orders(config, products)
+    orders, orders_by_id, noValido = add_orders(config, products)
     wave_config = add_wave_config(config)
 
     return WareHouse(
@@ -72,7 +72,7 @@ def build_warehouse(config: dict) -> WareHouse:
         orders,
         orders_by_id,
         wave_config
-    )
+    ), noValido
 
 
 def add_unique(items: LinkedList, by_id: Dictionary, item, label: str) -> None:

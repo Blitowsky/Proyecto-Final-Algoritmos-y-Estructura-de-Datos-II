@@ -58,8 +58,8 @@ class Wave:
             if search(self.line_index, line.value.product.id) is None:
                 new_products += 1
             available = line.value.product.available
-            if available is not None and line.value.qty > available:
-                return f"El pedido {order.id} pide {line.value.qty} {line.value.product.id}, pero solo quedan {available} sin reservar."
+            #if available is not None and line.value.qty > available:
+            #    return f"El pedido {order.id} pide {line.value.qty} {line.value.product.id}, pero solo quedan {available} sin reservar."
             line = line.nextNode
 
         if self.product_count + new_products > self.config.max_products:

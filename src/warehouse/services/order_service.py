@@ -8,6 +8,7 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
     order_list = config.get("pedidos", [])
     orders = LinkedList()
     by_id = Dictionary(2 * len(order_list) + 1)
+    noValido=[]
 
     for i in range(len(order_list)):
         o = order_list[i]
@@ -31,9 +32,15 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
             product = search(products, pid)
             if product is None:
                 raise ValueError(f"{label} pide un producto desconocido: {pid}")
-            order.add_line(product, item["cantidad"])
+            if product.reserved + item["cantidad"] <= product.stock:
+                product.reserved += item["cantidad"]
+                order.add_line(product, item["cantidad"])
+            else:
+                noValido.append(product.id)
+                print(f"No se puede agregar el pedido {pid} por reservado mas qty es: {product.reserved + item["cantidad"]} y la cantidad es {product.stock}")
+            
 
         add(orders, order)
         insert(by_id, order, oid)
 
-    return orders, by_id
+    return orders, by_id, noValido
