@@ -488,7 +488,7 @@ def exportar_resultados_csv(
 
 
 def main():
-    with open("escenario_grande.json", mode="r", encoding="utf-8") as f:
+    with open("escenario_basico.json", mode="r", encoding="utf-8") as f:
         data = json.load(f)
 
     grafo, celdas, ancho_x, largo_y = construir_grafo_desde_json(data)

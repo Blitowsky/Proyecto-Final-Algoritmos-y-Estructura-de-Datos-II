@@ -13,6 +13,7 @@ class _NodoCola:
         self.valor = valor
         self.siguiente = None
 
+# Acá el tipo implementó una cola FIFO desde 0
 
 class _ColaFIFO:
     """
@@ -57,13 +58,13 @@ def _obtener_vecinos_en_grafo(grafo, coord: tuple[int, int]) -> list[tuple[int, 
     sin acoplar el módulo a una única clase previa.
     Soporta:
       - Diccionario de adyacencia con claves (x, y) o "N_x_y".
-      - Estructura propia TablaHashCuadratica (método .buscar()).
+      - Estructura propia OpenDictionary (método .buscar()).
     """
     x, y = coord
     clave_str = f"N_{x}_{y}"
     datos = None
 
-    # Caso 1: TablaHashCuadratica u objeto con método buscar()
+    # Caso 1: OpenDictionary u objeto con método buscar()
     if hasattr(grafo, "buscar"):
         datos = grafo.buscar(coord)
         if datos is None:

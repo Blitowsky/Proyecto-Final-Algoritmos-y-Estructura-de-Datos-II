@@ -1,4 +1,9 @@
 # visualizar_zonas_csv.py
+
+"""Herramienta de visualización de los archivos .csv 
+generados por la clusterización espectral"""
+
+
 import csv
 import sys
 import matplotlib.pyplot as plt

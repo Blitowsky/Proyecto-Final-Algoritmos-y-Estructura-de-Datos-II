@@ -1,5 +1,5 @@
 # src/core/warehouse_generator.py
-from src.core.hash_table import TablaHashCuadratica
+from src.warehouse.structures.dictionary import OpenDictionary
 
 def _clasificar_celda_paralela(x: int, y: int, ancho_x: int, largo_y: int) -> str:
     """Clasifica el tipo de nodo para el Grafo 1 (Pasillos Paralelos Estándar)."""
@@ -36,13 +36,13 @@ def _clasificar_celda_cruzada(x: int, y: int, ancho_x: int, largo_y: int) -> str
     return "PASILLO"
 
 
-def _construir_grafo(ancho_x: int, largo_y: int, funcion_clasificadora) -> TablaHashCuadratica:
+def _construir_grafo(ancho_x: int, largo_y: int, funcion_clasificadora) -> OpenDictionary:
     """
     Construye el grafo en una TablaHashCuadratica.
     Cada nodo almacena: {"pos": (x, y), "tipo": str, "adyacentes": [id_vecinos]}
     """
     total_celdas = ancho_x * largo_y
-    grafo = TablaHashCuadratica(max(13, total_celdas * 2))
+    grafo = OpenDictionary(max(13, total_celdas * 2))
 
     # Mapeo temporal de tipos para armar conexiones válidas
     grilla_tipos = {}
@@ -82,7 +82,7 @@ def _construir_grafo(ancho_x: int, largo_y: int, funcion_clasificadora) -> Tabla
     return grafo
 
 
-def generar_dos_grafos_warehouse(ancho_x: int, largo_y: int) -> tuple[TablaHashCuadratica, TablaHashCuadratica]:
+def generar_dos_grafos_warehouse(ancho_x: int, largo_y: int) -> tuple[OpenDictionary, OpenDictionary]:
     """Genera y retorna los dos grafos con topologías distintas para el tamaño solicitado."""
     grafo_1 = _construir_grafo(ancho_x, largo_y, _clasificar_celda_paralela)
     grafo_2 = _construir_grafo(ancho_x, largo_y, _clasificar_celda_cruzada)
