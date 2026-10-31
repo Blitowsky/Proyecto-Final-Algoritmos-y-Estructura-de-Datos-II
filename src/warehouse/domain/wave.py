@@ -1,3 +1,20 @@
+"""
+Una wave representa UN recorrido por picker, como cada una 
+puede tener más de un `Picker` asignado, las wave.assignments 
+indican la tarea de cada picker individual, la lista de picks
+puede estar distribuida entre varios pickers.
+
+What changed from your version (every change is marked "M3"):
+  - Wave.status and the status constants: the life of a wave.
+  - Wave.assignments: the pickers serving it. A wave is ONE trip per picker, and its pick list may be
+    split among several pickers when no single one can carry it all.
+  - why_not() also checks stock: an order cannot ask for more units than are still unclaimed
+    (product.available = stock minus what other waves already reserved).
+  - add_order() reserves those units; release_stock() gives them back when a wave is discarded.
+  - There is NO weight check here any more: the weight rule is "every picker's share fits that
+    picker's capacity", which depends on the pickers, so services/wave_assignment.py enforces it.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.structures.dictionary import Dictionary, search, insert
 
@@ -16,6 +33,8 @@ class WaveConfig:
         self.max_products: int = max_products
 
 class WaveLine:
+    """Un producto en la lista de picks de la `Wave`,
+    con la cantidad total entre todas las ordenes."""
     def __init__(self, product: Product, qty: int) -> None:
         self.product: Product = product
         self.qty: int = qty
@@ -71,6 +90,8 @@ class Wave:
         return self.why_not(order) is None
 
     def add_order(self, order: Order) -> None:
+        """Asigna un pedido `Order` a la wave, y deja las
+        unidades correspondientes al pedido reservadas."""
         reason = self.why_not(order)
         if reason is not None:
             raise ValueError(reason)
@@ -91,6 +112,7 @@ class Wave:
                 self.product_count += 1
             self.total_units += line.value.qty
             self.total_weight += line.value.weight
+            line.value.product.reserve(line.value.qty)
 
             line = line.nextNode
 
@@ -109,6 +131,14 @@ class Wave:
             line.value.product.release(line.value.qty)
 
 class Assignment:
+    """
+    La tarea de un `picker` en una `wave`: UN recorrido
+    desde donde está parado el picker, pasando por las
+    paradas en `stops` hasta la zona de despacho `zone`.
+
+    Cada `Wave` tiene una asignación por cada picker que
+    pertenezca a ella, generalmente uno.
+    """
     def __init__(
         self, 
         wave: Wave, 

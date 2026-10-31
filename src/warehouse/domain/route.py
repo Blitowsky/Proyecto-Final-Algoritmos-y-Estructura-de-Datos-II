@@ -1,3 +1,9 @@
+"""
+Una ruta (`Route`) es un PLAN: el recorrido que va a hacer un picker,
+pierna por pierna, con sus métricas. Planear la ruta no toca a los
+pickers, solo la ejecución (`run_route()`).
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.structures.dictionary import Dictionary, insert, search
 
@@ -5,11 +11,16 @@ from warehouse.domain.product import Product
 from warehouse.domain.location import DispatchZone
 
 class PickLine:
+    """Un producto y cuántas unidades tomar."""
     def __init__(self, product: Product, qty: int) -> None:
         self.product: Product = product
         self.qty: int = qty
 
 class Stop:
+    """Una parada a la que tiene que ir un picker: cualquier
+    pasillo en `cells` sirve, desde ahí debe poder alcanzar
+    todas las lineas de productos en `picks`.
+    """
     def __init__(self, cells: LinkedList, picks: LinkedList) -> None:
         self.cells: LinkedList = cells
         self.picks: LinkedList = picks
@@ -39,6 +50,8 @@ class Stop:
 
     @classmethod
     def for_product(cls, product: Product, qty: int):
+        """Una parada (`Stop`) para un producto: todos los pasillos
+        adyacentes a su celda de rack son aceptables."""
         picks = LinkedList()
         add(picks, PickLine(product, qty))
         return cls(product.pick_cells, picks)
@@ -52,6 +65,20 @@ def _contains(cells: LinkedList, wanted: int):
     return False
 
 class Leg:
+    """
+    Un recorrido (pierna) de punto A a punto B.
+
+    Parámetros
+    ----------
+        kind (`str`):
+            Objetivo del recorrido.
+        path (`LinkedList`):
+            Lista de IDs de pasillo en el recorrido.
+        distance (`float`):
+            Suma de pesos en las aristas del recorrido.
+        stop (`Stop`):
+            Parada final del recorrido.
+    """
     def __init__(self, kind: str, path: LinkedList, distance: float, stop: Stop|None = None) -> None:
         self.kind: str = kind
         self.path: LinkedList = path
@@ -74,6 +101,16 @@ class Leg:
         return self.path.tail.value if self.path.tail else None
 
 class Route:
+    """Plan del recorrido total a realizar en una `Wave`
+    por un picker.
+
+    Parámetros
+    ----------
+        start (`int`):
+            ID del pasillo donde empieza la ruta.
+        zone (`DispatchZone`):
+            Zona de despacho donde termina la `Wave`.
+    """
     def __init__(self, start: int, zone: DispatchZone) -> None:
         self.start: int = start
         self.zone: DispatchZone = zone
@@ -101,6 +138,10 @@ class Route:
         self.edges += leg.edges
 
     def distinct_nodes(self, table_size: int) -> int:
+        """
+        Pasillos distintos visitados (una celda visitada dos veces cuenta una),
+        `table_size` = ancho * alto.
+        """
         seen = Dictionary(table_size)
         count = 0
         start = self.start

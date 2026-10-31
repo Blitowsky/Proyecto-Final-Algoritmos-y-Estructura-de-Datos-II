@@ -1,3 +1,9 @@
+"""
+El único módulo que busca por los pasillos del warehouse.
+Las waves, estrategias de enrutamiento y la simulación
+llaman estas funciones, nadie lo reimplementa.
+"""
+
 from warehouse.structures.graph import WeightedDirectedGraph
 from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.structures.dictionary import Dictionary, search, insert, delete

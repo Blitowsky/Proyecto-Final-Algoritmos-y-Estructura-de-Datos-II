@@ -1,8 +1,6 @@
 """
 Floor: plan de piso del warehouse, con ubicaciones de cosas fijas.
 WareHouse: `Floor` más estados de waves, pedidos, pickers, etc.
-
-
 """
 
 from warehouse.structures.linkedlist import LinkedList
@@ -83,6 +81,10 @@ class WareHouse:
         return node_id % self.width, node_id // self.width
 
     def dropoff_zones_at(self, node_id: int) -> LinkedList|None:
+        """
+        `LinkedList` de las zonas de despacho que tocan el pasillo `node_id`,
+        `None` si no toca ninguna.
+        """
         if search(self.floor.dropoff, node_id) is None:
             return None
         return search(self.floor.dropoff, node_id)

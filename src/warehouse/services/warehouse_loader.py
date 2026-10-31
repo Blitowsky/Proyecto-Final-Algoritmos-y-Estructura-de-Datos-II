@@ -54,6 +54,8 @@ def build_floor(config: dict) -> Floor:
     return floor
 
 def build_warehouse(config: dict) -> WareHouse:
+    """Constructor del `WareHouse` basado en el JSON,
+    o `ValueError` si falta algo/hay algún error."""
     floor = build_floor(config)
     graph = build_hall_graph(floor)
     build_rack_cells(floor)
@@ -180,6 +182,7 @@ def check_picker_starts(config: dict, floor: Floor) -> None:
             raise ValueError(f"{label} debe empezar en un pasillo, pero ({x}, {y}) es {cell.label()}.")
 
 def load_pickers(config: dict, floor: Floor) -> LinkedList:
+    """`LinkedList` de `Picker` según el JSON."""
     check_picker_starts(config, floor)
 
     pickers = LinkedList()
@@ -191,6 +194,8 @@ def load_pickers(config: dict, floor: Floor) -> LinkedList:
     return pickers
 
 def add_wave_config(config: dict) -> WaveConfig|None:
+    """Lee 'configuracion'. Retorna `WaveConfig`, o `None`
+    si falta esa sección en el JSON."""
     if "configuracion" not in config:
         return None
     wc = config["configuracion"]
@@ -198,6 +203,14 @@ def add_wave_config(config: dict) -> WaveConfig|None:
     return WaveConfig(wc["wave_max_pedidos"], wc["wave_max_productos"])
 
 def build_dropoff_cells(floor) -> None:
+    """Llena zone.access (`LinkedList` de IDs de pasillos) para cada zona de 
+    despacho, y floor.dropoff (ID pasillo) -> (`LinkedList` zonas que toca).
+
+    Parámetros
+    ----------
+        floor (`Floor`):
+            Plan de piso del warehouse.
+    """
     z = floor.zones.head
     while z is not None:
         if z.value is None:

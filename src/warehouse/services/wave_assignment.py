@@ -1,3 +1,9 @@
+"""
+Convierte la lista de picks de una ´wave´ en asignaciones ´Assigment´,
+qué `picker` lleva qué, dónde para, y a que zona de despacho lo tiene
+que llevar.
+"""
+
 import math
 
 from warehouse.structures.dictionary import Dictionary, insert, search
@@ -14,6 +20,9 @@ from warehouse.domain.wave import Assignment, Wave
 EPS = 1e-9
 
 def merge_lines(*sources) -> list[PickLine]:
+    """
+
+    """
     items = []
     for source in sources:
         line = source.head

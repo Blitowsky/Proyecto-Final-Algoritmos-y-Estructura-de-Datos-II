@@ -3,13 +3,7 @@ Ubicaciones simples:
 - `HallSection` (pasillo)
 - `Door` (puerta)
 
-Zonas de Despacho:
-
-El rectángulo debe tocar una pared (borde exterior del suelo), 
-no debe contener ningun rack ni superponerse con otra zona.
-
-zone.access es la lista de identificadores de los pasillos que
-se encuentran al borde de la zona.
+Y las Zonas de Despacho
 """
 
 from warehouse.structures.linkedlist import LinkedList, add
@@ -48,6 +42,12 @@ class Door:
         return self.kind != INBOUND
 
 class DispatchZone:
+    """
+    Un rectángulo que debe tocar una pared (borde exterior del suelo).
+
+    zone.access es la lista de IDs de los pasillos que se encuentran 
+    al borde de la zona.
+    """
     def __init__(self, zone_id: str, door_id: str, rect: Rect, max_weight: float) -> None:
         self.id: str = zone_id
         self.door_id: str = door_id
@@ -69,6 +69,7 @@ class DispatchZone:
         return self.load + weight <= self.max_weight + EPS
 
     def can_reserve(self, weight: float) -> bool:
+        """`True` si hay espacio reservable para `weight` kg más."""
         return self.load + self.reserved + weight <= self.max_weight + EPS
 
     def reserve(self, weight: float) -> None:

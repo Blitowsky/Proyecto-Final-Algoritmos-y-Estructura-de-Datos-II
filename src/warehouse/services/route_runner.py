@@ -1,3 +1,11 @@
+"""
+Planificación (sin efectos) y ejecución (mueve al picker).
+
+El orden de las paradas no se decide acá, quien sea que 
+llame decide la estrategia a usar. Entre dos paradas posibles,
+el planificador camina a la más cercana siempre.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.route import Leg, Route
@@ -13,6 +21,8 @@ def move_picker(
     targets: LinkedList,
     algorithm: str = "bfs"
 ) -> Leg:
+    """A -> B, encuentra el camino al objetivo más cercano
+    en `targets` y ejecuta el recorrido."""
     result = find_path(warehouse, picker.node, targets, algorithm)
     if result is None:
         raise ValueError(f"El picker {picker.id} no puede alcanzar el objetivo desde el pasillo {picker.node}.")
@@ -27,6 +37,10 @@ def plan_route(
     zone: DispatchZone,
     algorithm: str = "bfs"
 ) -> Route:
+    """Planifica la ruta hasta la zona de despacho `zone`,
+    luego de ahí a cada una de las paradas en `stops`, y
+    de vuelta hacia la zona de despacho indicada.
+    """
     route = Route(start, zone)
     here = start
 
@@ -62,6 +76,7 @@ def _search(
     return result
 
 def _walk(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
+    """Mueve el picker a lo largo de leg.path, una arista a la vez."""
     first = True
     walked = 0
     node = leg.path.head
@@ -82,6 +97,7 @@ def _walk(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
         raise ValueError(f"El camino planeado tenía distancia {leg.distance} pero la suma de pesos del recorrido en el grafo es {walked}.")
 
 def _check_can_serve(picker: Picker, route: Route) -> None:
+    """Deniega una ruta que fallaría a mitad de camino: muy pesada o no hay suficiente stock."""
     total = 0.0
     leg = route.legs.head
     while leg is not None:
@@ -109,6 +125,9 @@ def _check_can_serve(picker: Picker, route: Route) -> None:
         raise ValueError(f"La zona de despacho {zone.id} no puede aceptar {picker.load + total}kg ({zone.max_weight - zone.load}kg disponibles).")
 
 def run_route(picker: Picker, warehouse: WareHouse, route: Route) -> Route:
+    """Recorre la ruta `Route` con el `Picker`: movimientos, picks
+    y el despacho final.
+    """
     if route.executed:
         raise ValueError(f"Esta ruta ya fue ejecutada, planear una nueva.")
     if route.start != picker.node:
@@ -134,6 +153,7 @@ def perform_leg_action(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
                 line = line.nextNode
                 continue
             add(leg.items, picker.pick(line.value.product, line.value.qty))
+            line.value.product.release(line.value.qty)
             line = line.nextNode
     elif leg.kind == "return":
         leg.items = picker.drop_off(warehouse)
@@ -145,5 +165,7 @@ def visit(
     zone: DispatchZone,
     algorithm: str = "bfs"
 ) -> Route:
+    """`plan_route` y `run_route` en una llamada 
+    (primero planifica y luego recorre)."""
     route = plan_route(warehouse, picker.node, stops, zone, algorithm)
     return run_route(picker, warehouse, route)
