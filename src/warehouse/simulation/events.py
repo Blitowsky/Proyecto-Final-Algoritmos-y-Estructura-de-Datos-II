@@ -1,6 +1,9 @@
 from warehouse.domain.warehouse import WareHouse
 
 class Event:
+    """Lo que reporta la simulación: un evento por cada acción
+    que hace un picker por tick.
+    """
     def __init__(
         self,
         tick: int,

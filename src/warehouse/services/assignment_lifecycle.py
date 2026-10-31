@@ -1,3 +1,15 @@
+"""
+Los dos momentos en el ciclo de vida de una asignación `Assignment`
+que no dependen de como se mueva el picker.
+
+`services/wave_runner.run_assignment` recorre toda la ruta de una vez,
+mientras que la simulación lo hace un tick a la vez.
+
+`stop_orderer` es el hook a la función de wave picking que corresponda
+usar. Si no se asigna, se visitan las paradas en el orden en que
+`build_stops` las devuelve.
+"""
+
 from warehouse.domain.warehouse import WareHouse
 from warehouse.domain.wave import Assignment, Wave
 from warehouse.domain.route import Route
@@ -10,6 +22,10 @@ def start_assignment(
     stop_orderer: None,
     algorithm: str = "bfs"
 ) -> Route:
+    """
+    Planifica la ruta de la asignación desde donde está
+    parado el picker y verifica que se pueda cumplir.
+    """
     if assignment.status != "assigned":
         raise ValueError(f"Esta asignación está '{assignment.status}', solo las 'assigned' pueden ejecutarse.")
     wave = assignment.wave
@@ -36,6 +52,11 @@ def start_assignment(
     return route
 
 def finish_assignment(assignment: Assignment) -> None:
+    """
+    El picker terminó su asignación. El espacio reservado
+    de la zona de despacho se libera (porque ya está usado) y
+    el picker es liberado.
+    """
     if assignment.status != "running":
         raise ValueError(f"Esta asignación está '{assignment.status}', solo las que están 'running' pueden terminar.")
     wave = assignment.wave

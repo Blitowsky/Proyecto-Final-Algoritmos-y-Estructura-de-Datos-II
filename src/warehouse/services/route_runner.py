@@ -146,6 +146,11 @@ def run_route(picker: Picker, warehouse: WareHouse, route: Route) -> Route:
     return route
 
 def perform_leg_action(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
+    """
+    Ejecuta la acción correspondiente a la pierna cuando se
+    termina de recorrer: `PICK` toma todas las lineas de su
+    parada; `RETURN` despacha todo en la zona de despacho.
+    """
     if leg.kind == "pick" and leg.stop is not None:
         line = leg.stop.picks.head
         while line is not None:

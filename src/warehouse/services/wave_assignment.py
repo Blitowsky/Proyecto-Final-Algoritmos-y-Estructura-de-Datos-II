@@ -21,7 +21,8 @@ EPS = 1e-9
 
 def merge_lines(*sources) -> list[PickLine]:
     """
-
+    Suma varias listas de picks (iterables con .product y .qty),
+    wave.lines, order.lines, etc; en UNA lista de `PickLine`.
     """
     items = []
     for source in sources:
@@ -46,6 +47,22 @@ def merge_lines(*sources) -> list[PickLine]:
     return merged
 
 def split_load(lines: list[PickLine], pickers) -> list[tuple[Picker, list[PickLine]]]|None:
+    """Decide quién lleva qué. Si un picker puede llevar todo, el más débil lo hace
+    (así los pickers más fuertes quedan disponibles para waves más grandes). Sino,
+    se llenan los pickers secuencialmente, desde el más fuerte.
+
+    Parámetros
+    ----------
+        lines (`list`):
+            Iterable con líneas de productos.
+        pickers (`LinkedList`):
+            Lista de pickers a asignar.
+
+    Retorna
+    ----------
+    Una matriz, donde la primer columna son los pickers, y el resto de elementos
+    en cada fila son las líneas de productos asignadas a él.
+    """
     total = 0.0
     for line in lines:
         total += line.product.weight * line.qty
@@ -80,6 +97,19 @@ def split_load(lines: list[PickLine], pickers) -> list[tuple[Picker, list[PickLi
     return result
 
 def build_stops(warehouse: WareHouse, shares: list[PickLine]) -> LinkedList:
+    """Agrupa las líneas asignadas a un picker en paradas `Stop`. Todos
+    los productos que comparten la misma celda de rack se toman en una
+    misma parada.
+
+    Retorna
+    ---------
+    `LinkedList` de `Stop`s.
+    """
+    """
+    Groups a picker's shares into Stops: all the products of ONE rack cell are picked in one stop
+    (P001 and P002 both sit in cell (3, 5)). Returns a LinkedList of Stop, in the order each rack
+    cell first appears in the shares. Deciding the order the stops are VISITED in is M4's job.
+    """
     groups = []
     where = Dictionary(warehouse.width * warehouse.height)
     for line in shares:
@@ -98,6 +128,7 @@ def build_stops(warehouse: WareHouse, shares: list[PickLine]) -> LinkedList:
     return stops
 
 def free_pickers(warehouse: WareHouse) -> list[Picker]:
+    """Array de pickers que no tienen tareas asignadas."""
     free = []
     picker = warehouse.pickers.head
     while picker is not None:
@@ -107,6 +138,8 @@ def free_pickers(warehouse: WareHouse) -> list[Picker]:
     return free
 
 def choose_zone(warehouse: WareHouse, picker: Picker, weight: float, algorithm: str = "bfs") -> DispatchZone|None:
+    """La primer zona de despacho de tipo `OUTBOUND` o `AMBOS` que esté más
+    cerca del `picker` y que tenga espacio disponible para `weight` kg más"""
     best = None
     best_distance = math.inf
     z = warehouse.zones.head
@@ -134,6 +167,15 @@ def assign_wave(
     pickers: list[Picker]|None = None,
     algorithm: str = "bfs"
 ) -> LinkedList:
+    """
+    Asigna los pickers, tareas, paradas y zonas a una wave 
+    recién creada. El espacio de las zonas de despacho queda
+    reservado por cada asignación.
+
+    Retorna
+    ----------
+    wave.assignments (`LinkedList` de asignaciones `Assignment`).
+    """
     if wave.status != "created" or wave.assignment_count > 0:
         raise ValueError(f"La wave {wave.id} está '{wave.status}' y ya tiene {wave.assignment_count} asignaciones.")
 
@@ -176,6 +218,8 @@ def assign_wave(
     return wave.assignments
 
 def cancel_assignments(wave: Wave) -> None:
+    """Deshace el trabajo de `assign_wave`: libera los pickers y
+    libera el espacio reservado de las zonas de despacho."""
     if wave.status not in ("created", "assigned"):
         raise ValueError(f"La wave {wave.id} está '{wave.status}', sus asignaciones no pueden ser canceladas.")
     assignment = wave.assignments.head

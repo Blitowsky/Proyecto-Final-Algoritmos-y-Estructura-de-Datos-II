@@ -1,3 +1,9 @@
+"""
+Agrupa los pedidos en estado `PENDIENTE` en waves. La regla
+de agrupamiento se corresponde con la estrategia a usar,
+indicada en `selector`.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.structures.queue import Queue
 
@@ -9,6 +15,7 @@ from warehouse.services.wave_assignment import cancel_assignments, merge_lines, 
 
 
 class Rejection:
+    """Un pedido que no pudo tomar ninguna `wave`."""
     def __init__(self, order: Order, reason: str) -> None:
         self.order: Order = order
         self.reason: str = reason
@@ -42,6 +49,15 @@ class WaveBuilder:
         return f"El pedido {order.id} ({order.total_weight}kg) no puede ser cargado por ningún picker: {", ".join([f"{p.id} {p.capacity}kg" for p in list(self.pickers) if p is not None])}"
 
     def build(self) -> tuple[LinkedList, LinkedList]:
+        """Agrupa todos los pedidos PENDIENTEs en el warehouse
+
+        Retorna
+        ----------
+            waves (`LinkedList`):
+                Lista de waves `Wave` creadas.
+            rejected (`LinkedList`):
+                Lista de waves rechazadas `Rejection`.
+        """
         pending = []
         pending = Queue()
         order = self.warehouse.orders.head
