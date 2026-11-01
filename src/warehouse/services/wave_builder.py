@@ -58,28 +58,51 @@ class WaveBuilder:
             rejected (`LinkedList`):
                 Lista de waves rechazadas `Rejection`.
         """
+        if self.selector and getattr(self.selector, "generate_waves", None) is not None:
+            waves = self.selector.generate_waves()
+            wave = waves.head
+            while wave is not None:
+                if wave.value is not None:
+                    self.created += 1
+                    add(self.warehouse.waves, wave.value)
+                wave = wave.nextNode
+            return waves, LinkedList()
+
         pending = []
-        pending = Queue()
         order = self.warehouse.orders.head
         while order is not None:
             if order.value and order.value.state == "PENDIENTE":
-                pending.enqueue(order.value)
+                pending.append(order.value)
             order = order.nextNode
-        
-        # TODO Ordenar 'pending' con las estrategias que desarrollemos
+
+        if self.selector is not None:
+            pending = self.selector.sort()
 
         waves = LinkedList()
         rejected = LinkedList()
 
-        while not pending.is_empty():
+        while len(pending) > 0:
             wave = Wave(self.id_prefix + str(self.created + 1), self.warehouse.wave_config)
-            order = pending.dequeue()
+            if self.selector is not None:
+                while True:
+                    order = self.selector.next_order(wave, pending, lambda o: self._fits(wave, o))
+                    if order is None:
+                        break
+                    wave.add_order(order)
+                    pending.remove(order)
 
-            if self._fits(wave, order):
-                wave.add_order(order)
+                if wave.order_count == 0:
+                    order = pending.pop(0)
+                    add(rejected, Rejection(order, self._reason_alone(order)))
+                    continue
             else:
-                add(rejected, Rejection(order, self._reason_alone(order)))
-                continue
+                order = pending.pop(0)
+
+                if self._fits(wave, order):
+                    wave.add_order(order)
+                else:
+                    add(rejected, Rejection(order, self._reason_alone(order)))
+                    continue
             
             self.created += 1
             add(waves, wave)

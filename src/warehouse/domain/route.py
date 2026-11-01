@@ -119,6 +119,7 @@ class Route:
         self.distance: float = 0.0
         self.edges: int = 0
         self.executed: bool = False
+        self.order_time: float|None = None
 
     @property
     def nodes(self) -> int:

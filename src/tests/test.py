@@ -1,6 +1,7 @@
 import os
 
 from warehouse.algorithms.pathfinding import find_path
+from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.hall_graph_builder import build_hall_graph
 from warehouse.services.route_runner import move_picker
@@ -119,7 +120,16 @@ print()
 #
 # print(render_map(warehouse.floor, picker_current_cells(warehouse)))
 
-waves, rejected = WaveBuilder(warehouse, pickers=warehouse.pickers).build()
+selector = ProductCentroidSelector(warehouse, warehouse.orders)
+waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
+# CON generacion de waves
+# {'ticks': 1366, 'assignments': 11, 'planned_distance': 4739.0, 'steps': 4751, 'waits': 15, 'reroutes': 7, 'side_steps': 0}
+
+# SIN generacion de waves (solo ordenando pedidos)
+# {'ticks': 1930, 'assignments': 12, 'planned_distance': 5416.0, 'steps': 5432, 'waits': 25, 'reroutes': 8, 'side_steps': 2}
+
+# waves, rejected = WaveBuilder(warehouse, selector=None, pickers=warehouse.pickers).build()
+# {'ticks': 1714, 'assignments': 40, 'planned_distance': 6183.0, 'steps': 6191, 'waits': 14, 'reroutes': 4, 'side_steps': 0}
 
 simulation = Simulation(
         warehouse,
