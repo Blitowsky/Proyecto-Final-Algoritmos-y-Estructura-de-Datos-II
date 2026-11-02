@@ -1,286 +1,265 @@
+# src/clustering/spectral.py
 
 import math
 import numpy as np
 import pandas as pd
-import warehouse.structures.linkedlist as ll
-import warehouse.structures.graph
+
+from warehouse.domain.warehouse import WareHouse
+from warehouse.domain.product import Product
+from warehouse.structures.linkedlist import LinkedList, add, length
+from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.algorithms.pathfinding import bfs_distances_targeted
 
 
-def build_distance_matrix(points: list, metric: str = 'e', graph=None) -> np.ndarray:
+
+# =====================================================================
+# FASE 0: EXTRACCIÓN DE PRODUCTOS Y NODOS DESDE EL WAREHOUSE
+# =====================================================================
+def extract_pending_products(warehouse: WareHouse) -> list[Product]:
     """
-    Construye la Matriz de Distancias.
-    
-    Soporta dos métricas:
-    - 'e': Distancia geométrica en línea recta ignorando obstáculos.
-    - 't': Cantidad real de pasos a través de los pasillos del Warehouse.
-    
-    Args:
-        points: Lista de objetos Producto que poseen atributos .id, .x, .y
-        metric: 'euclidean' o 'topological'
-        graph: Instancia del WeightedDirectedGraph. Requerido si la métrica es topológica.
-        
-    Returns:
-        np.ndarray: Matriz simétrica de NxN con las distancias.
+    Recorre la LinkedList de pedidos (warehouse.orders) y sus líneas (order.lines)
+    para extraer una lista sin duplicados de todos los productos demandados
+    por pedidos en estado 'PENDIENTE'.
     """
-    n_points = len(points)
-    
-    # Inicializamos una matriz NxN llena de infinitos (np.inf). 
-    # Usar NumPy aquí garantiza máxima eficiencia espacial y temporal en memoria contigua.
-    distance_matrix = np.full((n_points, n_points), np.inf, dtype=float)
-    
-    # La distancia de un nodo a sí mismo siempre es 0
-    np.fill_diagonal(distance_matrix, 0.0)
-    
-    if metric == 'e':
-        # Calculamos solo el triángulo superior de la matriz para evitar trabajo duplicado
-        for i in range(n_points):
-            for j in range(i + 1, n_points):
-                x1, y1 = points[i].x, points[i].y
-                x2, y2 = points[j].x, points[j].y
-                
-                # Fórmula matemática de distancia euclidiana
-                dist = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-                
-                # Simetrizamos la matriz
-                distance_matrix[i, j] = dist
-                distance_matrix[j, i] = dist
-                
-    elif metric == 't':
-        if graph is None:
-            raise ValueError("Se debe proporcionar un 'graph' para usar la métrica topológica.")
-            
-        # Convertimos la lista de productos a la estructura LinkedList 
-        # requerida por tu función bfs_distances_targeted
-        targets_list = ll.LinkedList()
-        for p in points:
-            targets_list.add(p.id)
-            
-        # Calculamos los caminos óptimos.
-        # Iteramos sobre cada producto actuando como nodo 'origen'
-        for i in range(n_points):
-            source_id = points[i].id
-            
-            # topologicall_distance devuelve tu estructura 'Dictionary' 
-            # con las distancias desde 'source_id' a todos los nodos en 'targets_list'
-            resultados_bfs = gd.topologicall_distance(graph, source_id, targets_list)
-            
-            for j in range(i + 1, n_points):
-                target_id = points[j].id
-                
-                # Buscamos la distancia de ida (i -> j) en tu Dictionary personalizado
-                dist_ida = search(resultados_bfs, target_id)
-                dist_ida = dist_ida if dist_ida is not None else math.inf
-                
-                # Para asegurar la simetría exigida por el Laplaciano del clustering espectral
-                # en grafos dirigidos, debemos calcular también el camino inverso (j -> i) 
-                # (Lo cual podrías optimizar pre-calculando el diccionario inverso si es necesario)
-                resultados_inversos = gd.topologicall_distance(graph, target_id, targets_list)
-                dist_vuelta = search(resultados_inversos, source_id)
-                dist_vuelta = dist_vuelta if dist_vuelta is not None else math.inf
-                
-                # Simetrización: Tomamos la ruta transitable más corta (o su promedio)
-                dist_efectiva = min(dist_ida, dist_vuelta)
-                
-                distance_matrix[i, j] = dist_efectiva
-                distance_matrix[j, i] = dist_efectiva
-                
+    unique_products: list[Product] = []
+    # Usamos el Dictionary propio del proyecto para evitar productos duplicados en O(1)
+    seen = Dictionary(warehouse.width * warehouse.height)
+
+    order_node = warehouse.orders.head
+    while order_node is not None:
+        order = order_node.value
+        if order is not None and order.state == "PENDIENTE":
+            line_node = order.lines.head
+            while line_node is not None:
+                line = line_node.value
+                if line is not None and line.product is not None:
+                    prod = line.product
+                    if search(seen, prod.id) is None:
+                        insert(seen, True, prod.id)
+                        unique_products.append(prod)
+                line_node = line_node.nextNode
+        order_node = order_node.nextNode
+
+    return unique_products
+
+
+def get_product_access_node(product: Product) -> int:
+    """
+    Obtiene el ID del vértice del pasillo (en warehouse.graph) desde el cual
+    el picker accede físicamente al producto.
+    """
+    if product.pick_cells is None or product.pick_cells.head is None:
+        raise ValueError(f"El producto {product.id} no tiene celdas de acceso (pick_cells).")
+    return product.pick_cells.head.value
+
+
+# =====================================================================
+# PASO 1: MATRIZ DE DISTANCIAS Y MATRIZ DE SIMILITUD (W)
+# =====================================================================
+def build_distance_matrix(
+    products: list[Product],
+    metric: str = "t",
+    warehouse: WareHouse | None = None
+) -> np.ndarray:
+    """
+    Construye la matriz simétrica de distancias (NxN) entre los productos.
+    Soporta métrica 'e' (línea recta) o 't' (pasos reales de pasillo).
+    """
+    n = len(products)
+    dist_matrix = np.full((n, n), np.inf, dtype=float)
+    np.fill_diagonal(dist_matrix, 0.0)
+
+    if metric == "e":
+        for i in range(n):
+            for j in range(i + 1, n):
+                dx = products[i].x - products[j].x
+                dy = products[i].y - products[j].y
+                d = math.sqrt(dx * dx + dy * dy)
+                dist_matrix[i, j] = d
+                dist_matrix[j, i] = d
+
+    elif metric == "t":
+        if warehouse is None:
+            raise ValueError("Se requiere la instancia 'warehouse' para la distancia topológica.")
+
+        # 1. Obtenemos el nodo de pasillo de acceso para cada producto
+        access_nodes = [get_product_access_node(p) for p in products]
+
+
+        # 2. Calculamos las distancias entre nodos a partir de BFS
+        targets = LinkedList()
+        unique_nodes = set()
+        for node_id in access_nodes:
+            if node_id not in unique_nodes:
+                unique_nodes.add(node_id)
+                add(targets, node_id)
+
+        distance_maps = {}
+        for node_id in unique_nodes:
+            distance_maps[node_id] = bfs_distances_targeted(warehouse.graph, node_id, targets)
+        # 3. Llenamos la matriz simetrizando los caminos de ida y vuelta
+
+        for i in range(n):
+            u = access_nodes[i]
+            for j in range(i + 1, n):
+                v = access_nodes[j]
+                if u == v:
+                    dist_efectiva = 0.0
+                else:
+                    d_uv = search(distance_maps[u], v)
+                    d_vu = search(distance_maps[v], u)
+
+                    d_uv = float(d_uv) if d_uv is not None else math.inf
+                    d_vu = float(d_vu) if d_vu is not None else math.inf
+
+                    # En pasillos con sentido único, tomamos la ruta más corta válida
+                    dist_efectiva = min(d_uv, d_vu)
+
+                dist_matrix[i, j] = dist_efectiva
+                dist_matrix[j, i] = dist_efectiva
     else:
-        raise ValueError("Métrica inválida. Utilice 'euclidean' o 'topological'.")
-        
-    return distance_matrix
+        raise ValueError("Métrica inválida. Use 'e' o 't'.")
 
+    return dist_matrix
+
+
+def build_similarity_matrix(distance_matrix: np.ndarray) -> np.ndarray:
+    """Convierte la matriz de distancias en Matriz de Afinidad W usando Kernel Gaussiano (RBF)."""
+    finite_dists = distance_matrix[(distance_matrix > 0) & np.isfinite(distance_matrix)]
+    sigma = float(np.median(finite_dists)) if finite_dists.size > 0 else 1.0
+    if sigma <= 0:
+        sigma = 1.0
+
+    similarity_matrix = np.exp(-(distance_matrix ** 2) / (2.0 * (sigma ** 2)))
+    np.fill_diagonal(similarity_matrix, 0.0)
+    return similarity_matrix
+
+
+# =====================================================================
+# PASO 2, 3 Y 4: LAPLACIANO, AUTOVECTORES Y EMBEDDING ESPECTRAL
+# =====================================================================
 def compute_laplacian_matrix(similarity_matrix: np.ndarray, normalized: bool = True) -> np.ndarray:
-    """
-    Paso 2 del Clustering Espectral: Calcular la Matriz Laplaciana.
-    
-    Esta función toma la Matriz de Similitud (W) generada en el Paso 1 y 
-    construye el Laplaciano del grafo, el cual captura la información 
-    esencial de la conectividad y los "cuellos de botella" topológicos.
-    
-    Args:
-        similarity_matrix (np.ndarray): La matriz W (NxN) del Paso 1.
-        normalized (bool): Si es True, calcula el Laplaciano Simétrico Normalizado.
-                           Si es False, calcula el Laplaciano estándar (L = D - W).
-                           
-    Returns:
-        np.ndarray: La matriz Laplaciana resultante (NxN).
-    """
     n_points = similarity_matrix.shape[0]
-    
-    # 1. Matriz Diagonal de Grados (D)
-    # Sumamos los pesos de las aristas por cada fila para saber qué tan "conectado" está cada nodo.
     degrees = np.sum(similarity_matrix, axis=1)
-    
+
     if not normalized:
-        # Laplaciano No Normalizado: L = D - W
-        D = np.diag(degrees)
-        L = D - similarity_matrix
-        return L
-    
-    else:
-        # Laplaciano Simétrico Normalizado: L_sym = I - D^(-1/2) @ W @ D^(-1/2)
-        # Protegemos matemáticamente la división por cero si un nodo quedó aislado
-        degrees_inv_sqrt = np.where(degrees > 1e-12, 1.0 / np.sqrt(degrees), 0.0)
-        
-        # Convertimos el vector en una matriz diagonal
-        D_inv_sqrt = np.diag(degrees_inv_sqrt)
-        
-        # Matriz Identidad (I)
-        I = np.eye(n_points)
-        
-        # Multiplicación matricial (operador @ de NumPy para producto punto)
-        L_sym = I - (D_inv_sqrt @ similarity_matrix @ D_inv_sqrt)
-        
-        return L_sym    
+        return np.diag(degrees) - similarity_matrix
+
+    degrees_inv_sqrt = np.where(degrees > 1e-12, 1.0 / np.sqrt(degrees), 0.0)
+    D_inv_sqrt = np.diag(degrees_inv_sqrt)
+    I = np.eye(n_points)
+    return I - (D_inv_sqrt @ similarity_matrix @ D_inv_sqrt)
+
 
 def compute_eigenvectors(laplacian_matrix: np.ndarray, num_clusters: int) -> np.ndarray:
-    """
-    Paso 3 del Clustering Espectral: Calcular Autovectores (Eigenvectors).
-    
-    Toma la Matriz Laplaciana (simétrica) y extrae los 'k' autovectores 
-    asociados a los autovalores más pequeños. Opcionalmente normaliza 
-    las filas para preparar los datos para K-Means.
-    
-    Args:
-        laplacian_matrix (np.ndarray): La Matriz Laplaciana (NxN) del Paso 2.
-        num_clusters (int): La cantidad K de zonas/olas que deseas generar.
-        
-    Returns:
-        np.ndarray: Matriz de tamaño NxK que contiene los autovectores seleccionados.
-    """
-    # 1. Descomposición Espectral
-    # Usamos np.linalg.eigh en lugar de eig porque eigh está altamente optimizado 
-    # y diseñado matemáticamente para matrices simétricas (como nuestro Laplaciano).
-    # Además, garantiza que los autovalores devueltos estén ordenados de menor a mayor.
-    eigenvalues, eigenvectors = np.linalg.eigh(laplacian_matrix)
-    
-    # 2. Selección de los "K" autovectores principales
-    # Tomamos todas las filas, pero solo las primeras 'num_clusters' columnas.
-    # El primer autovalor siempre será cercano a 0 (autovector trivial), y los 
-    # siguientes capturan los "cortes mínimos" del grafo.
-    k_eigenvectors = eigenvectors[:, :num_clusters]
-    
-    # 3. Normalización de filas (Algoritmo de Ng, Jordan & Weiss)
-    # Proyecta los puntos resultantes sobre una esfera unitaria. Esto hace que 
-    # la agrupación posterior con K-Means sea mucho más precisa y estable.
-    row_norms = np.linalg.norm(k_eigenvectors, axis=1, keepdims=True)
-    
-    # Prevenimos divisiones por cero en nodos completamente desconectados
-    row_norms = np.where(row_norms > 1e-12, row_norms, 1.0)
-    
-    normalized_eigenvectors = k_eigenvectors / row_norms
-    
-    return normalized_eigenvectors
+    _, eigenvectors = np.linalg.eigh(laplacian_matrix)
+    return eigenvectors[:, :num_clusters]
+
 
 def create_spectral_embedding(eigenvectors: np.ndarray) -> np.ndarray:
-    """
-    Paso 4 del Clustering Espectral: Crear el Embedding Espectral.
-    
-    Toma la matriz de autovectores (NxK) del Paso 3, donde cada columna es un 
-    autovector y cada fila representa a un producto de tu Warehouse.
-    Normaliza cada fila para proyectar los datos en un nuevo espacio geométrico
-    (esfera unitaria) de baja dimensión, volviendo los grupos linealmente separables.
-    
-    Args:
-        eigenvectors (np.ndarray): Matriz de autovectores (NxK) crudos del Paso 3.
-        
-    Returns:
-        np.ndarray: Matriz de Embedding (NxK). Las filas son las nuevas coordenadas
-                    de tus productos listas para pasar por K-Means.
-    """
-    # 1. Calcular la norma L2 (magnitud euclidiana) de cada fila.
-    # El parámetro axis=1 indica que sumamos a lo largo de las columnas por cada fila.
     row_norms = np.linalg.norm(eigenvectors, axis=1, keepdims=True)
-    
-    # 2. Estabilidad Numérica.
-    # Prevenimos divisiones por cero en caso de que algún nodo (producto) 
-    # haya quedado matemáticamente aislado en el grafo del Warehouse.
     row_norms = np.where(row_norms > 1e-12, row_norms, 1.0)
-    
-    # 3. Creación del Embedding.
-    # Dividimos cada componente de la fila por la magnitud total de esa fila.
-    spectral_embedding = eigenvectors / row_norms
-    
-    return spectral_embedding
+    return eigenvectors / row_norms
 
 
-def initialize_centroids_maximin(k, data_np):
-    """
-    Inicialización 100% determinista (Maximin / Farthest-First).
-    Selecciona el primer punto del arreglo y luego busca secuencialmente 
-    los puntos más alejados de los centroides ya elegidos.
-    """
+# =====================================================================
+# PASO 5: K-MEANS DETERMINISTA (MAXIMIN)
+# =====================================================================
+def initialize_centroids_maximin(k: int, data_np: np.ndarray) -> pd.DataFrame:
     centroides = [data_np[0]]
     for _ in range(1, k):
-        # Calcula la distancia de todos los puntos al centroide más cercano
-        dist_min = np.array([min(np.linalg.norm(p - c)**2 for c in centroides) for p in data_np])
-        # Elige como nuevo centroide el punto con la máxima de esas distancias mínimas
-        centroides.append(data_np[np.argmax(dist_min)])
-    
+        dist_min = np.array([
+            min(np.linalg.norm(p - c) ** 2 for c in centroides)
+            for p in data_np
+        ])
+        centroides.append(data_np[int(np.argmax(dist_min))])
     return pd.DataFrame(centroides)
 
-def assign_centroid(data_df, centroids_df):
-    """
-    Calcula la distancia euclidiana al cuadrado de cada fila a todos los centroides.
-    Devuelve la lista de índices del centroide más cercano y los errores.
-    """
-    # Excluímos la columna 'centroid' de los cálculos matemáticos
-    puntos = data_df.drop(columns=['centroid'], errors='ignore').values
-    cent_vals = centroids_df.drop(columns=['centroid'], errors='ignore').values
-    
+
+def assign_centroid(data_df: pd.DataFrame, centroids_df: pd.DataFrame) -> tuple[list[int], list[float]]:
+    puntos = data_df.drop(columns=["centroid"], errors="ignore").values
+    cent_vals = centroids_df.drop(columns=["centroid"], errors="ignore").values
+
     asignaciones = []
     errores = []
-    
     for punto in puntos:
-        distancias = [np.linalg.norm(punto - c)**2 for c in cent_vals]
-        asignaciones.append(np.argmin(distancias))
-        errores.append(np.min(distancias))
-        
+        distancias = [float(np.linalg.norm(punto - c) ** 2) for c in cent_vals]
+        asignaciones.append(int(np.argmin(distancias)))
+        errores.append(float(np.min(distancias)))
+
     return asignaciones, errores
 
-def kmeans_espectral(k, spectral_embedding):
-    '''
-    Recibe la matriz generada en el Paso 4 y el número de clusters.
-    Devuelve las asignaciones, el error y los centroides finales.
-    '''
-    # 1. Adaptación de entrada: Convertimos el array de NumPy (Paso 4) a DataFrame
+
+def kmeans_espectral(k: int, spectral_embedding: np.ndarray):
     data = pd.DataFrame(spectral_embedding)
-    
-    # 2. Inicializamos con nuestro algoritmo determinista
     centroids = initialize_centroids_maximin(k, spectral_embedding)
     error = []
     compr = True
     i = 0
 
     while compr:
-        # Obtain centroids and error
-        data['centroid'], iter_error = assign_centroid(data, centroids)
+        data["centroid"], iter_error = assign_centroid(data, centroids)
         error.append(sum(iter_error))
-        
-        # Recalculate centroids
-        centroids = data.groupby('centroid').agg('mean').reset_index(drop=True)
+        centroids = data.groupby("centroid").agg("mean").reset_index(drop=True)
 
-        # Check if the error has decreased
         if len(error) < 2:
             compr = True
         else:
-            if round(error[i], 3) != round(error[i-1], 3):
-                compr = True
-            else:
-                compr = False
-        i += 1 
+            compr = round(error[i], 3) != round(error[i - 1], 3)
+        i += 1
 
-    # Retornamos los valores limpios listos para inyectarse en el Wave Manager
-    return data['centroid'].values, error, centroids.values
-
-def main(graph: WeightedDirectedGraph, orders):
-
-    list = ll.LinkedList()
-    
-    for order in orders:
-        for product in order:
-            list.add((product.x, product.y, product.id))
-
-    ll.print_list(list)
+    return data["centroid"].values, error, centroids.values
 
 
+# =====================================================================
+# FUNCIÓN PRINCIPAL (MAIN) PARA INYECTAR EN TEST.PY
+# =====================================================================
+def main(
+    warehouse: WareHouse,
+    k_zones: int | None = None,
+    metric: str = "t"
+) -> list[list[tuple[int, int]]]:
+    """
+    Orquesta el proceso completo de Clustering Espectral sobre el Warehouse:
+      1. Extrae los productos de los pedidos pendientes.
+      2. Determina la cantidad de zonas K (por defecto, la cantidad de pickers).
+      3. Ejecuta los 5 pasos del Clustering Espectral.
+      4. Imprime el resumen legible por consola y retorna la lista de listas de coordenadas (x,y).
+    """
+    products = extract_pending_products(warehouse)
+    if not products:
+        print("[Clustering Espectral] No hay productos en pedidos pendientes.")
+        return []
+
+    # Si no se especifica k_zones, usamos la cantidad de pickers disponibles en el Warehouse
+    if k_zones is None:
+        k_zones = max(1, length(warehouse.pickers))
+    k_zones = min(k_zones, len(products))
+
+    # Ejecución secuencial de los 5 pasos
+    dist_matrix = build_distance_matrix(products, metric=metric, warehouse=warehouse)
+    sim_matrix = build_similarity_matrix(dist_matrix)
+    laplacian = compute_laplacian_matrix(sim_matrix, normalized=True)
+    eigenvectors = compute_eigenvectors(laplacian, k_zones)
+    embedding = create_spectral_embedding(eigenvectors)
+    labels, _, _ = kmeans_espectral(k_zones, embedding)
+
+    # Agrupamos tanto las coordenadas (x, y) como los objetos Product para mostrarlos
+    zones_coords: list[list[tuple[int, int]]] = [[] for _ in range(k_zones)]
+    zones_products: list[list[Product]] = [[] for _ in range(k_zones)]
+
+    for prod, cluster_id in zip(products, labels):
+        zones_coords[int(cluster_id)].append((prod.x, prod.y))
+        zones_products[int(cluster_id)].append(prod)
+
+    # Impresión limpia de resultados para el test
+    print("=" * 70)
+    print(f" RESULTADO CLUSTERING ESPECTRAL (Métrica: {metric.upper()} | Zonas: {k_zones})")
+    print("=" * 70)
+    for idx, (prod_list, coord_list) in enumerate(zip(zones_products, zones_coords), start=1):
+        nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
+        print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
+        print(f"    Coordenadas (x, y) : {coord_list}")
+    print("=" * 70)
+
+    return [z for z in zones_coords if z]

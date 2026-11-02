@@ -1,13 +1,30 @@
 from warehouse.structures.linkedlist import LinkedList, add
-from warehouse.structures.dictionary import CloseDictionary, search, insert
+from warehouse.structures.dictionary import Dictionary, search, insert
 
 from warehouse.domain.order import Order
 from warehouse.persistence.scenario_loader import require_keys, require_id
 
-def add_orders(config: dict, products: CloseDictionary) -> tuple[LinkedList, CloseDictionary]:
+def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictionary]:
+    """Retorna lista y hash table de pedidos (`Order`) del JSON
+        
+    Parámetros
+    ----------
+        config (`dict`):
+            JSON de configuración parseado.
+        products (`Dictionary`):
+            Hash table de productos.
+
+    Retorna
+    ----------
+        [0] orders (`LinkedList`):
+            Lista de objetos pedido.
+        [1] by_id (`Dictionary`):
+            Hash table con (ID pedido) -> (`Order`)
+
+    """
     order_list = config.get("pedidos", [])
     orders = LinkedList()
-    by_id = CloseDictionary(2 * len(order_list) + 1)
+    by_id = Dictionary(2 * len(order_list) + 1)
 
     for i in range(len(order_list)):
         o = order_list[i]

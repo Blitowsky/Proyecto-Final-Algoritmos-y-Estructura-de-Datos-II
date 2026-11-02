@@ -1,3 +1,9 @@
+"""
+Funciones auxiliares que le asignan a cada Rack de la grilla 
+su propio objeto, y los enlaza a los vértices pasillo desde 
+los cuales un `Picker` puede acceder a sus productos.
+"""
+
 from warehouse.domain.warehouse import Floor
 from warehouse.structures.dictionary import insert
 from warehouse.structures.linkedlist import LinkedList, add
@@ -7,6 +13,13 @@ from warehouse.domain.cell import HALL
 from warehouse.domain.direction import MOVES, step
 
 def find_access_cells(floor: Floor, x: int, y: int) -> LinkedList:
+    """Regla: adyacencia ortogonal, cada vecino de la celda
+    de `Rack` que sea una celda pasillo.
+
+    Retorna
+    ----------
+    `LinkedList` de IDs de los pasillos correspondientes.
+    """
     access = LinkedList()
     for move in MOVES:
         dx, dy = step(move)
