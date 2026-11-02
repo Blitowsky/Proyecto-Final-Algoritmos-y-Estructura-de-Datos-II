@@ -1,7 +1,7 @@
 # src/core/hash_table.py
 import math
 
-class TablaHashCuadratica:
+class OpenDictionary:
     VACIO = 0
     OCUPADO = 1
     ELIMINADO = 2

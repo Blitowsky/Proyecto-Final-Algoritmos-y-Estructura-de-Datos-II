@@ -1,6 +1,6 @@
 import numpy as np
 # Reemplaza esta ruta por la ruta real donde guardaste tu clase
-from hash_table import TablaHashCuadratica 
+from src.warehouse.structures.dictionary import OpenDictionary 
 
 def _crear_tabla_estandar(diccionario_adyacencia):
     """
@@ -11,7 +11,7 @@ def _crear_tabla_estandar(diccionario_adyacencia):
     # Para la tabla hash con quadratic probing, iniciamos con una capacidad 
     # de al menos el doble de los vértices para evitar un rehashing inmediato.
     capacidad_inicial = max(11, len(diccionario_adyacencia) * 2)
-    tabla = TablaHashCuadratica(capacidad_inicial)
+    tabla = OpenDictionary(capacidad_inicial)
     
     for nodo, vecinos in diccionario_adyacencia.items():
         # Eliminamos duplicados por si el formato crudo venía sucio

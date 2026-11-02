@@ -3,6 +3,7 @@ import csv
 import json
 import math
 import numpy as np
+import Espectral.spectral_clustering as sc
 
 
 # =====================================================================
@@ -117,135 +118,6 @@ class _ColaFIFO:
             self.final = None
         self.tamaño -= 1
         return valor
-
-
-# =====================================================================
-# 2. MÓDULO DE CLUSTERING ESPECTRAL (INDEPENDIENTE)
-# =====================================================================
-def _bfs_distancias_desde_origen(grafo, origen: tuple[int, int], destinos_objetivo: set[tuple[int, int]]) -> dict:
-    """Calcula pasos reales de pasillo respetando sentido de circulación y racks impenetrables."""
-    cola = _ColaFIFO()
-    cola.encolar(origen)
-    visitados = {origen: 0}
-    encontrados = {}
-
-    if origen in destinos_objetivo:
-        encontrados[origen] = 0
-
-    while not cola.esta_vacia() and len(encontrados) < len(destinos_objetivo):
-        actual = cola.desencolar()
-        dist_actual = visitados[actual]
-        datos_actual = grafo.buscar(actual)
-        vecinos = datos_actual["adyacentes"] if datos_actual else []
-
-        for vecino in vecinos:
-            datos_vec = grafo.buscar(vecino)
-            es_rack = (datos_vec["tipo"] == "RACK") if datos_vec else False
-
-            if vecino not in visitados:
-                if not es_rack:
-                    visitados[vecino] = dist_actual + 1
-                    if vecino in destinos_objetivo:
-                        encontrados[vecino] = dist_actual + 1
-                    cola.encolar(vecino)
-                else:
-                    # Un rack es alcanzable desde su pasillo lateral, pero no se puede atravesar
-                    if vecino in destinos_objetivo and vecino not in encontrados:
-                        encontrados[vecino] = dist_actual + 1
-
-    return encontrados
-
-
-def construir_matriz_distancias_pasillos(coordenadas: list[tuple[int, int]], grafo_pasillos) -> np.ndarray:
-    p = len(coordenadas)
-    matriz_dist = np.full((p, p), np.inf, dtype=float)
-    np.fill_diagonal(matriz_dist, 0.0)
-
-    conjunto_coords = set(coordenadas)
-    mapa_bfs = {coord: _bfs_distancias_desde_origen(grafo_pasillos, coord, conjunto_coords) for coord in conjunto_coords}
-
-    for i in range(p):
-        u = coordenadas[i]
-        for j in range(i + 1, p):
-            v = coordenadas[j]
-            d_uv = mapa_bfs[u].get(v, math.inf)
-            d_vu = mapa_bfs[v].get(u, math.inf)
-            if d_uv < math.inf and d_vu < math.inf:
-                dist_real = 0.5 * (d_uv + d_vu)
-            else:
-                dist_real = min(d_uv, d_vu)
-            matriz_dist[i, j] = dist_real
-            matriz_dist[j, i] = dist_real
-    return matriz_dist
-
-
-def _kmeans_determinista(matriz_puntos: np.ndarray, k: int, max_iter: int = 100) -> list[int]:
-    n_puntos = matriz_puntos.shape[0]
-    centroides = [matriz_puntos[0].copy()]
-    for _ in range(1, k):
-        dist_min = np.array([min(np.linalg.norm(p - c) ** 2 for c in centroides) for p in matriz_puntos])
-        centroides.append(matriz_puntos[int(np.argmax(dist_min))].copy())
-    centroides = np.array(centroides)
-    etiquetas = [0] * n_puntos
-
-    for _ in range(max_iter):
-        nuevas = [int(np.argmin([np.linalg.norm(matriz_puntos[i] - c) ** 2 for c in centroides])) for i in range(n_puntos)]
-        if nuevas == etiquetas:
-            break
-        etiquetas = nuevas
-        for cid in range(k):
-            idxs = [i for i, e in enumerate(etiquetas) if e == cid]
-            if idxs:
-                centroides[cid] = np.mean(matriz_puntos[indices if False else idxs], axis=0)
-    return etiquetas
-
-
-def agrupar_por_clustering_espectral(
-    coordenadas: list[tuple[int, int]],
-    cantidad_zonas: int,
-    grafo_pasillos
-) -> tuple[list[list[tuple[int, int]]], list[int]]:
-    """
-    Recibe una lista de coordenadas (x, y) y devuelve:
-      1) Lista de listas con las zonas y puntos correspondientes a cada una.
-      2) Lista de etiquetas de zona (0 .. K-1) alineada con 'coordenadas'.
-    """
-    if not coordenadas:
-        return [], []
-    n_puntos = len(coordenadas)
-    if cantidad_zonas <= 1:
-        return [list(coordenadas)], [0] * n_puntos
-    if cantidad_zonas >= n_puntos:
-        return [[c] for c in coordenadas], list(range(n_puntos))
-
-    matriz_dist = construir_matriz_distancias_pasillos(coordenadas, grafo_pasillos)
-    dist_finitas = matriz_dist[(matriz_dist > 0) & np.isfinite(matriz_dist)]
-    sigma = float(np.median(dist_finitas)) if dist_finitas.size > 0 else 1.0
-    if sigma <= 0:
-        sigma = 1.0
-
-    W = np.exp(-(matriz_dist ** 2) / (2.0 * (sigma ** 2)))
-    np.fill_diagonal(W, 0.0)
-
-    grados = np.sum(W, axis=1)
-    grados_inv_sqrt = np.where(grados > 1e-12, 1.0 / np.sqrt(grados), 0.0)
-    D_inv_sqrt = np.diag(grados_inv_sqrt)
-    L_sym = np.eye(n_puntos) - (D_inv_sqrt @ W @ D_inv_sqrt)
-
-    _, autovectores = np.linalg.eigh(L_sym)
-    U = autovectores[:, :cantidad_zonas]
-    normas = np.linalg.norm(U, axis=1, keepdims=True)
-    normas = np.where(normas > 1e-12, normas, 1.0)
-    T = U / normas
-
-    etiquetas = _kmeans_determinista(T, cantidad_zonas)
-    zonas_dict = {z: [] for z in range(cantidad_zonas)}
-    for coord, zid in zip(coordenadas, etiquetas):
-        zonas_dict[zid].append(coord)
-
-    zonas_lista = [pts for pts in zonas_dict.values() if pts]
-    return zonas_lista, etiquetas
-
 
 # =====================================================================
 # 3. CONSTRUCCIÓN DEL ESCENARIO Y GRAFICACIÓN POR CONSOLA
@@ -488,7 +360,7 @@ def exportar_resultados_csv(
 
 
 def main():
-    with open("escenario_grande.json", mode="r", encoding="utf-8") as f:
+    with open("escenario_basico.json", mode="r", encoding="utf-8") as f:
         data = json.load(f)
 
     grafo, celdas, ancho_x, largo_y = construir_grafo_desde_json(data)
@@ -498,12 +370,12 @@ def main():
         pos for pos, info in celdas.items()
         if info["tipo"] in ("PASILLO", "RACK", "DESPACHO", "PUERTA")
     ]
-    zonas_wh, etiquetas_wh = agrupar_por_clustering_espectral(nodos_activos, 2, grafo)
+    zonas_wh, etiquetas_wh = sc.agrupar_por_clustering_espectral(nodos_activos, 2, grafo)
     mapa_zonas_wh = {coord: zid + 1 for coord, zid in zip(nodos_activos, etiquetas_wh)}
 
     # 2. Agrupar las coordenadas de los productos del escenario en K=2 zonas
     coords_productos = [(p["ubicacion"]["x"], p["ubicacion"]["y"]) for p in data["productos"]]
-    zonas_productos, _ = agrupar_por_clustering_espectral(coords_productos, 2, grafo)
+    zonas_productos, _ = sc.agrupar_por_clustering_espectral(coords_productos, 2, grafo)
 
     # 3. Graficar por consola ambas soluciones
     graficar_solucion_por_consola(

@@ -12,12 +12,12 @@ class Graph:
         self.graph = self.createGraph()
 
     # Ejercicio 1
-    def createGraph(self) -> Dictionary:
+    def createGraph(self) -> CloseDictionary:
         v = self.v
         e = self.e
 
         len_v = self.m if self.m is not None else lk.length(v)
-        graph = Dictionary(len_v)
+        graph = CloseDictionary(len_v)
         self._insert_vertices(graph)
 
         curr_e = e.head
@@ -33,7 +33,7 @@ class Graph:
 
         return graph
 
-    def _insert_vertices(self, graph: Dictionary) -> None:
+    def _insert_vertices(self, graph: CloseDictionary) -> None:
         curr_v = self.v.head
         while curr_v is not None:
             insert(graph, curr_v.value)
@@ -61,11 +61,11 @@ class WeightedGraph(Graph):
         self.e = e
         self.graph = self.createWeightedGraph()
  
-    def createWeightedGraph(self) -> Dictionary:
+    def createWeightedGraph(self) -> CloseDictionary:
         v = self.v
         e = self.e
  
-        graph = Dictionary(lk.length(v))
+        graph = CloseDictionary(lk.length(v))
         self._insert_vertices(graph)
  
         curr_e = e.head
@@ -84,12 +84,12 @@ class WeightedDirectedGraph(Graph):
         self.m = m
         self.graph = self.createWeightedDirectedGraph()
  
-    def createWeightedDirectedGraph(self) -> Dictionary:
+    def createWeightedDirectedGraph(self) -> CloseDictionary:
         v = self.v
         e = self.e
  
         len_v = self.m if self.m is not None else lk.length(v)
-        graph = Dictionary(len_v)
+        graph = CloseDictionary(len_v)
         self._insert_vertices(graph)
  
         curr_e = e.head
@@ -103,8 +103,8 @@ class WeightedDirectedGraph(Graph):
 class DisjointSet:
     def __init__(self, v: lk.LinkedList) -> None:
         len_v = lk.length(v)
-        self.parent = Dictionary(len_v)
-        self.rank = Dictionary(len_v)
+        self.parent = CloseDictionary(len_v)
+        self.rank = CloseDictionary(len_v)
 
         curr_v = v.head
         while curr_v is not None:
