@@ -1,3 +1,4 @@
+
 import os
 
 from warehouse.persistence.scenario_loader import load_config
@@ -5,6 +6,7 @@ from warehouse.services.hall_graph_builder import build_hall_graph
 from warehouse.services.warehouse_loader import build_floor, build_warehouse
 from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.visualization.ascii_map import render_map, render_rows
+import clustering.spectral as sc
 
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 
@@ -24,4 +26,5 @@ def test_grid(floor):
 
 test_grid(warehouse.floor)
 print()
+
 

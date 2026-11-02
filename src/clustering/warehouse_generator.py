@@ -1,5 +1,5 @@
 # src/core/warehouse_generator.py
-from src.warehouse.structures.dictionary import OpenDictionary
+from warehouse.structures.dictionary import OpenDictionary
 
 def _clasificar_celda_paralela(x: int, y: int, ancho_x: int, largo_y: int) -> str:
     """Clasifica el tipo de nodo para el Grafo 1 (Pasillos Paralelos Estándar)."""
