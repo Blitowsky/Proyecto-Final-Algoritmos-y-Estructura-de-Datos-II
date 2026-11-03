@@ -12,7 +12,7 @@ from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
 from warehouse.algorithms.generacioWave import generacionWaves
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_06_vertical.json")
 
 config = load_config(SCENARIO)
 warehouse, noValido = build_warehouse(config)
@@ -150,7 +150,7 @@ simulation.run()
 
 print(simulation.summary())
 print()
-
+"""
 for event in simulation.events:
     if event.kind != "move":
         print(event.describe(warehouse))
@@ -158,3 +158,4 @@ print()
 
 print(render_map(warehouse.floor, picker_current_cells(warehouse)))
 
+"""
