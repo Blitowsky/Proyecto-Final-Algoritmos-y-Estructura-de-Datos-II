@@ -41,7 +41,7 @@ def run_search(warehouse: WareHouse, algo, src: tuple[int, int], dst: tuple[int,
     result: SearchResult|None = find_path(warehouse, src_id, target, algo)
     if result:
         return { "cost": result.distance, "expanded": result.expanded, "examined": result.examined }
-    raise ValueError(f"No path found from {src} to {dst}.")
+    return { "cost": 0, "expanded": 0, "examined": 0 }
 
 
 def run_simulation(warehouse: WareHouse, strategy_key):
