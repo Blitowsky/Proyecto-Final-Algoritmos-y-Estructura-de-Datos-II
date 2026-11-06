@@ -1,3 +1,10 @@
+"""
+Varios pickers caminando a la vez, un `tick` después del otro.
+El costo de un picker es UNA acción por UN tick.
+
+Todo lo que pasa es un evento `Event`, que es lo que muestra la UI.
+"""
+
 from warehouse.domain.picker import Picker
 from warehouse.services.assignment_lifecycle import finish_assignment, start_assignment
 from warehouse.structures.dictionary import Dictionary, insert
@@ -14,6 +21,7 @@ from warehouse.simulation.rerouting import free_neighbor, reroute_around
 from warehouse.structures.linkedlist import length
 
 class Record:
+    """Lo que costó una asignación, escrito cuando termina."""
     def __init__(self, walker: Walker, end_tick: int, steps: int) -> None:
         assignment: Assignment = walker.assignment
         self.picker: str = walker.picker.id
@@ -32,6 +40,20 @@ class Record:
         return self.end_tick - self.start_tick + 1 if self.start_tick >= 0 else -1
 
 class Simulation:
+    """El estado actual de la simulación
+
+    Parámetros
+    ----------
+        stop_orderer (`func`):
+            El hook de la estrategia de wave picking 
+            seleccionada para ordenar pedidos.
+        patience (`int`):
+            Número de ticks de paciencia antes de que
+            un picker decida tomar otra acción.
+        auto_assign (`bool`):
+            Si `True`, las waves se crean y asignan a
+            los pickers libres automáticamente.
+    """
     def __init__(
         self,
         warehouse: WareHouse,
@@ -56,6 +78,8 @@ class Simulation:
         self.records: list[Record] = []
         self._asked_to_step_aside: list[tuple[str|None, str|None]] = []
 
+        self.summary_visits: list[tuple[int, int]] = []
+
     @property
     def finished(self) -> bool:
         if len(self.walkers) > 0:
@@ -75,14 +99,16 @@ class Simulation:
                 wave = wave.nextNode
         return True
 
-    def run(self) -> list[Event]:
+    def run(self, with_visits: bool = False) -> list[Event]:
+        """Corre hasta que todo esté terminado, retorna el log de eventos."""
         while not self.finished:
             if self.tick >= self.max_ticks:
                 raise Exception(self._stuck_message())
-            self.step()
+            self.step(with_visits)
         return self.events
 
-    def step(self) -> list[Event]:
+    def step(self, with_visits: bool = False) -> list[Event]:
+        """Un `tick`. Retorna los eventos `Event` de este tick."""
         self.tick += 1
         out = []
         warehouse = self.warehouse
@@ -117,6 +143,8 @@ class Simulation:
                 insert(claimed, True, cell)
             elif kind == "act":
                 acting.append(walker)
+            if with_visits:
+                self.summary_visits.append(self.warehouse.node_xy(walker.picker.node))
 
         stepping_aside = []
         for picker_id, in_the_way_of in self._asked_to_step_aside:
@@ -381,6 +409,8 @@ class Simulation:
         self._asked_to_step_aside.append((picker_id, in_the_way_of))
 
     def _path_cells(self, picker_id: str) -> Dictionary:
+        """Hash table de las celdas que le quedan en frente al picker 
+        para terminar, para que un paso al costado las evite."""
         cells = Dictionary(self.warehouse.width * self.warehouse.height)
         walker = self._walker(picker_id)
         if walker is not None:
@@ -418,6 +448,8 @@ class Simulation:
         return None
         
     def _rank(self, picker_id: str) -> tuple[int, int, str]:
+        """Mientras más chico, más fuerte. Para pickers asignados:
+        la prioridad de wave más alta, despúes el id."""
         walker = self._walker(picker_id)
         if walker is None:
             return (1, 0, str(picker_id))
@@ -432,6 +464,7 @@ class Simulation:
         return text
 
     def summary(self) -> dict:
+        """Métricas finales de la simulación."""
         total = {
             "ticks": self.tick,
             "assignments": 0,
@@ -439,7 +472,8 @@ class Simulation:
             "steps": 0,
             "waits": 0,
             "reroutes": 0,
-            "side_steps": 0
+            "side_steps": 0,
+            "summary_visits": self.summary_visits
         }
 
         for record in self.records:

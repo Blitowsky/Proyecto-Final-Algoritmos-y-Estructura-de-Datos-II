@@ -1,8 +1,15 @@
+"""
+Cada producto apunta a la celda de `Rack` en la que se encuentra (`product.cell`).
+A su vez, `product.half.access` contiene la lista de nodos en los que el picker 
+puede situarse para recogerlo.
+"""
+
 from warehouse.structures.linkedlist import LinkedList
 
 from warehouse.domain.rack import Rack, RackCell
 
 class Product:
+    """Cada producto, con stock y ubicación asignadas."""
     def __init__(self, product_id, name: str, weight: float, stock: int, cell: RackCell, z: int) -> None:
         self.id = product_id
         self.name: str = name
@@ -14,6 +21,7 @@ class Product:
 
     @property
     def available(self) -> int|None:
+        """Unidades que una NUEVA `Wave` puede reclamar."""
         if self.stock is None:
             return None
         return self.stock - self.reserved
@@ -42,4 +50,6 @@ class Product:
 
     @property
     def pick_cells(self) -> LinkedList:
+        """`LinkedList` con IDs de pasillos (vértices del grafo)
+        desde los que un picker puede acceder a este producto."""
         return self.cell.access

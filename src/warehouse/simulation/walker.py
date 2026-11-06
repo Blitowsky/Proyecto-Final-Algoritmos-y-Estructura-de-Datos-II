@@ -1,3 +1,9 @@
+"""
+Un `Walker` no decide nada respecto a conflictos, solo dice 
+lo que quiere hacer el picker en el próximo tick (`peek`) y
+lo hace solo si la simulación lo permite (`step_to`, `act`).
+"""
+
 from warehouse.algorithms.pathfinding import find_path
 from warehouse.structures.linkedlist import LinkedList, add
 
@@ -10,6 +16,7 @@ from warehouse.services.route_runner import perform_leg_action
 
 
 class Walker:
+    """Picker en movimiento y su ruta planeada, paso por paso."""
     def __init__(self, warehouse: WareHouse, assignment: Assignment, algorithm: str = "bfs") -> None:
         self.warehouse: WareHouse = warehouse
         self.assignment: Assignment = assignment
@@ -44,6 +51,7 @@ class Walker:
         self._enter_next_leg()
 
     def peek(self) -> tuple[str, int|None]:
+        """Lo proximo que quiere hacer el picker."""
         while not self.done:
             self._sync()
             if self.index < len(self.path) - 1:
@@ -54,6 +62,7 @@ class Walker:
         return "done", None
 
     def goal_cells(self) -> LinkedList|None:
+        """Las celdas que terminarian la pierna actual (cualquiera sirve)."""
         if self.leg is None:
             return None
         if self.leg.kind == "pick" and self.leg.stop:
@@ -72,6 +81,7 @@ class Walker:
         self.waiting_for = None
 
     def act(self) -> Leg|None:
+        """Picks o despachos."""
         leg = self.leg
         if leg is None:
             return None
@@ -83,11 +93,14 @@ class Walker:
         return leg
 
     def refused(self, blocker: str|None) -> None:
+        """Llamado por la simulación cuando el paso
+        de este picker fue rechazado este tick."""
         self.waits += 1
         self.waited += 1
         self.waiting_for = blocker
 
     def reroute(self, path: list[int]) -> None:
+        """Reemplaza el resto de la pierna actual."""
         self.path = path
         self.index = 0
         self.reroutes += 1
@@ -111,6 +124,8 @@ class Walker:
         self.index = 0
 
     def _sync(self) -> None:
+        """Si el picker no está en el pasillo que el plan esperaba,
+        planifica el resto de la pierna desde donde esté parado."""
         if self.path[self.index] == self.picker.node:
             return
         goal = self.goal_cells()

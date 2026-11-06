@@ -1,3 +1,11 @@
+"""
+Dos funciones auxiliares usadas cuando esperar
+no resuelve un conflicto.
+
+Esperar siempre es la primera opción (la simulación
+lo intenta por `patience` ticks).
+"""
+
 from warehouse.structures.dictionary import Dictionary, insert, search
 
 from warehouse.domain.warehouse import WareHouse
@@ -15,6 +23,15 @@ def reroute_around(
     others: list[int],
     algorithm: str = "bfs"
 ) -> int|None:
+    """
+    Planifica un nuevo camino para `walker` desde donde
+    su picker está parado hasta el destino de la pierna
+    actual.
+
+    1. Primera opción: un camino que evita a `cell` y 
+       las celdas ocupadas por `others`.
+    2. Segunda opción: solo evitar `cell`.
+    """
     goal = walker.goal_cells()
     if goal is None:
         return None
@@ -57,6 +74,14 @@ def free_neighbor(
     claimed: Dictionary,
     avoid: Dictionary|None = None
 ):
+    """
+    Mueve a un picker un paso al costado de `cell` donde
+    no haya nadie ni a otra celda que quiera alguien en 
+    el próximo tick. `avoid` es opcional, e incluye las
+    celdas a las que otros pickers planean moverse en el 
+    futuro, ya que moverse ahí resultaría en otra colisión
+    más tarde.
+    """
     best = None
     best_in_the_way = None
     edge = neighbors(warehouse.graph, cell).head
