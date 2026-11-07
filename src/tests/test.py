@@ -12,7 +12,7 @@ from warehouse.services.wave_runner import process_pending
 from warehouse.simulation.simulation import Simulation
 from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
-import clustering.spectral as sc
+import clustering.spectral as cs
 
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 

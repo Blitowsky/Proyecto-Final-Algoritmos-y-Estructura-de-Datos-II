@@ -1,5 +1,5 @@
 from warehouse.structures.linkedlist import LinkedList, add
-from warehouse.structures.dictionary import CloseDictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, Dictionary, search, insert
 
 from warehouse.domain.order import Order
 from warehouse.persistence.scenario_loader import require_keys, require_id

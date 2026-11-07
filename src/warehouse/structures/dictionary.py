@@ -28,52 +28,57 @@ class CloseDictionary:
                 current = current.nextNode
             print("None")
 
-    # Ejercicio 2
-    def insert(D: CloseDictionary, value, key = None) -> CloseDictionary:
-        key = key if key is not None else value
+# Ejercicio 2
+def insert(D: CloseDictionary, value, key = None) -> CloseDictionary:
+    key = key if key is not None else value
 
-        def to_key(value) -> int:
-            s = str(value)
-            return int(s) if s.isdigit() else sum(ord(ch) for ch in s)
+    def to_key(value) -> int:
+        s = str(value)
+        return int(s) if s.isdigit() else sum(ord(ch) for ch in s)
 
-        hashed_key = D.hash_func(key)
-        lk.add(D.dictionary[hashed_key], (to_key(key), value))
-        return D
+    hashed_key = D.hash_func(key)
+    lk.add(D.dictionary[hashed_key], (to_key(key), value))
+    return D
 
-    def search(D: CloseDictionary, value, key = None):
-        key = key if key is not None else value
+def search(D: CloseDictionary, value, key = None):
+    key = key if key is not None else value
 
-        def to_key(value) -> int:
-            s = str(value)
-            return int(s) if s.isdigit() else sum(ord(ch) for ch in s)
+    def to_key(value) -> int:
+        s = str(value)
+        return int(s) if s.isdigit() else sum(ord(ch) for ch in s)
 
-        hashed_key = D.hash_func(key)
-        current = D.dictionary[hashed_key].head
-        while current is not None:
-            if current.value:
-                if current.value[0] == to_key(key):
-                    return current.value[1]
-            current = current.nextNode
+    hashed_key = D.hash_func(key)
+    current = D.dictionary[hashed_key].head
+    while current is not None:
+        if current.value:
+            if current.value[0] == to_key(key):
+                return current.value[1]
+        current = current.nextNode
 
-        return None
+    return None
 
-    def delete(D: CloseDictionary, key: int, value = None) -> CloseDictionary:
-        hashed_key = D.hash_func(key)
-        col_list = D.dictionary[hashed_key]
-        current = col_list.head
-        while current is not None:
-            if current.value:
-                if value is not None :
-                    if current.value[1] == value:
-                        lk.delete(col_list, current.value)
-                        break
-                else:
-                    if current.value[0] == key:
-                        lk.delete(col_list, current.value)
-                        break
-            current = current.nextNode
-        
-        return D
+def delete(D: CloseDictionary, key: int, value = None) -> CloseDictionary:
+    hashed_key = D.hash_func(key)
+    col_list = D.dictionary[hashed_key]
+    current = col_list.head
+    while current is not None:
+        if current.value:
+            if value is not None :
+                if current.value[1] == value:
+                    lk.delete(col_list, current.value)
+                    break
+            else:
+                if current.value[0] == key:
+                    lk.delete(col_list, current.value)
+                    break
+        current = current.nextNode
+    
+    return D
+
+CloseDictionary.insert = insert
+CloseDictionary.search = search
+CloseDictionary.delete = delete
+Dictionary = CloseDictionary
 
 
 class OpenDictionary:

@@ -4,7 +4,7 @@ WareHouse: `Floor` más estados de waves, pedidos, pickers, etc.
 """
 
 from warehouse.structures.linkedlist import LinkedList
-from warehouse.structures.dictionary import CloseDictionary, search
+from warehouse.structures.dictionary import CloseDictionary, Dictionary, search
 from warehouse.structures.graph import WeightedDirectedGraph
 
 from warehouse.domain.rack import Rack
