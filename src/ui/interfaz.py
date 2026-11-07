@@ -1,3 +1,6 @@
+
+import os
+
 import sys
 import math
 
@@ -5,6 +8,8 @@ from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdi
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
+
+from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
 from warehouse.services.wave_builder import WaveBuilder
 from warehouse.simulation.simulation import Simulation
 from warehouse.persistence.scenario_loader import load_config
@@ -36,8 +41,11 @@ class Ventana(QWidget):
         self.escala = 1
         
         #Imagenes de la interfaz
-        self.imagen_picker = QPixmap("src/ui/assets/construction-worker.png")
-        self.imagen_producto = QPixmap("src/ui/assets/box.png")
+
+        PICKER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "construction-worker.png")
+        self.imagen_picker = QPixmap(PICKER_PATH)
+        PRODUCT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "box.png")
+        self.imagen_producto = QPixmap(PRODUCT_PATH)
         
         
         #Timer que va avanzando la simulacion
@@ -92,6 +100,10 @@ class Ventana(QWidget):
         self.ancho_panel = 400
         self.separacion_panel = 30
         self.margen_derecho = 30
+
+        #Posicion y tamaño
+        self.panel_eventos.setGeometry(920, 60, 400, 550)
+
 
         #Texto inicial
         self.panel_eventos.setPlainText("Eventos de la simulacion:\n")
@@ -296,6 +308,7 @@ class Ventana(QWidget):
         )
 
         super().resizeEvent(event)
+
 
     def coordenada_a_pixel(self, x, y):
 
@@ -797,6 +810,15 @@ for wave in waves:
 warehouse.waves=wavesWareHouse
 
 
+#####
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_05_grande_mixto.json")
+config = load_config(SCENARIO)
+
+#Construyo el warehouse
+warehouse = build_warehouse(config)
+
+selector = ProductCentroidSelector(warehouse, warehouse.orders)
+waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
 
 #Creo la simulacion
 simulation = Simulation(
@@ -811,4 +833,6 @@ ventana = Ventana(warehouse, simulation)
 
 ventana.showMaximized()
 
+
 app.exec()
+print(simulation.summary())

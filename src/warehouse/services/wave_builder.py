@@ -1,3 +1,9 @@
+"""
+Agrupa los pedidos en estado `PENDIENTE` en waves. La regla
+de agrupamiento se corresponde con la estrategia a usar,
+indicada en `selector`.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.structures.queue import Queue
 
@@ -9,6 +15,7 @@ from warehouse.services.wave_assignment import cancel_assignments, merge_lines, 
 
 
 class Rejection:
+    """Un pedido que no pudo tomar ninguna `wave`."""
     def __init__(self, order: Order, reason: str) -> None:
         self.order: Order = order
         self.reason: str = reason
@@ -42,28 +49,60 @@ class WaveBuilder:
         return f"El pedido {order.id} ({order.total_weight}kg) no puede ser cargado por ningún picker: {", ".join([f"{p.id} {p.capacity}kg" for p in list(self.pickers) if p is not None])}"
 
     def build(self) -> tuple[LinkedList, LinkedList]:
+        """Agrupa todos los pedidos PENDIENTEs en el warehouse
+
+        Retorna
+        ----------
+            waves (`LinkedList`):
+                Lista de waves `Wave` creadas.
+            rejected (`LinkedList`):
+                Lista de waves rechazadas `Rejection`.
+        """
+        if self.selector and getattr(self.selector, "generate_waves", None) is not None:
+            waves = self.selector.generate_waves()
+            wave = waves.head
+            while wave is not None:
+                if wave.value is not None:
+                    self.created += 1
+                    add(self.warehouse.waves, wave.value)
+                wave = wave.nextNode
+            return waves, LinkedList()
+
         pending = []
-        pending = Queue()
         order = self.warehouse.orders.head
         while order is not None:
             if order.value and order.value.state == "PENDIENTE":
-                pending.enqueue(order.value)
+                pending.append(order.value)
             order = order.nextNode
-        
-        # TODO Ordenar 'pending' con las estrategias que desarrollemos
+
+        if self.selector is not None:
+            pending = self.selector.sort()
 
         waves = LinkedList()
         rejected = LinkedList()
 
-        while not pending.is_empty():
+        while len(pending) > 0:
             wave = Wave(self.id_prefix + str(self.created + 1), self.warehouse.wave_config)
-            order = pending.dequeue()
+            if self.selector is not None:
+                while True:
+                    order = self.selector.next_order(wave, pending, lambda o: self._fits(wave, o))
+                    if order is None:
+                        break
+                    wave.add_order(order)
+                    pending.remove(order)
 
-            if self._fits(wave, order):
-                wave.add_order(order)
+                if wave.order_count == 0:
+                    order = pending.pop(0)
+                    add(rejected, Rejection(order, self._reason_alone(order)))
+                    continue
             else:
-                add(rejected, Rejection(order, self._reason_alone(order)))
-                continue
+                order = pending.pop(0)
+
+                if self._fits(wave, order):
+                    wave.add_order(order)
+                else:
+                    add(rejected, Rejection(order, self._reason_alone(order)))
+                    continue
             
             self.created += 1
             add(waves, wave)

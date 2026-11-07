@@ -1,3 +1,14 @@
+"""
+Ejecuta todas las asignaciones de principio a fin, un picker
+detrás del otro. La versión simultánea está en:
+`simulation/simulation.py`
+
+`stop_orderer` es el hook a la función a usar como
+estrategia de wave picking, debe retornar las paradas
+en el orden a visitar. Sino, se visitan en el orden
+en el que `build_stops` las devuelve.
+"""
+
 from warehouse.services.assignment_lifecycle import finish_assignment, start_assignment
 from warehouse.services.wave_assignment import assign_wave
 from warehouse.services.wave_builder import WaveBuilder
@@ -16,6 +27,7 @@ def run_assignment(
     stop_orderer = None,
     algorithm: str = "bfs"
 ) -> Route:
+    """Planifica y ejecuta la tarea de un picker"""
 
     route = start_assignment(warehouse, assignment, stop_orderer, algorithm)
     run_route(assignment.picker, warehouse, route)
@@ -28,6 +40,7 @@ def run_wave(
     stop_orderer = None,
     algorithm: str = "bfs"
 ) -> None:
+    """Ejecuta todas las asignaciones de `wave`, una detrás de la otra."""
     if wave.status not in ("assigned", "running"):
         raise ValueError(f"La wave {wave.id} está '{wave.status}', primero hay que asignarla.")
     assignment = wave.assignments.head
@@ -42,6 +55,15 @@ def process_pending(
     stop_orderer = None,
     algorithm: str = "bfs"
 ) -> tuple[LinkedList, LinkedList]:
+    """
+    Todo el proceso en una llamada: agrupar pedidos pendientes
+    en waves, asignar tareas de esta wave a los pickers libres
+    y ejecutarlas.
+
+    Retorna 
+    ----------
+    (`waves`, `rejected`) del `builder`.
+    """
     waves, rejected = WaveBuilder(warehouse, selector).build()
     wave = waves.head
     while wave is not None:
