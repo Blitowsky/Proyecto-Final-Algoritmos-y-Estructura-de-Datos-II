@@ -1,6 +1,9 @@
 import sys
 import math
+import os
+import clustering.spectral as cs
 
+from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
@@ -18,7 +21,7 @@ from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 
 class Ventana(QWidget):
 
-    def __init__(self, warehouse, simulation):
+    def __init__(self, warehouse, simulation, zonas_espectrales=None):
         super().__init__()
 
         #Guardo el warehouse que recibo
@@ -26,6 +29,25 @@ class Ventana(QWidget):
         
         #Guardo la simulacion
         self.simulation = simulation
+        
+        #Guardo las zonas generadas por clustering
+        self.zonas_espectrales = zonas_espectrales
+
+        #Diccionario para saber rapidamente
+        #a que zona pertenece cada producto
+        self.zona_producto = {}
+        
+        if self.zonas_espectrales is not None:
+
+            numero_zona = 1
+
+            for zona in self.zonas_espectrales:
+
+                for producto in zona:
+
+                    self.zona_producto[producto.id] = numero_zona
+
+                numero_zona += 1
 
         #Espacio que dejo alrededor del warehouse
         self.margen = 60
@@ -34,8 +56,18 @@ class Ventana(QWidget):
         self.escala = 1
         
         #Imagenes de la interfaz
-        self.imagen_picker = QPixmap("src/ui/assets/construction-worker.png")
-        self.imagen_producto = QPixmap("src/ui/assets/box.png")
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "assets"
+        )
+
+        self.imagen_picker = QPixmap(
+            os.path.join(assets_dir, "construction-worker.png")
+        )
+
+        self.imagen_producto = QPixmap(
+            os.path.join(assets_dir, "box.png")
+        )
         
         
         #Timer que va avanzando la simulacion
@@ -45,7 +77,7 @@ class Ventana(QWidget):
         self.timer.timeout.connect(self.avanzar_simulacion)
 
         #Tiempo entre ticks
-        self.timer.setInterval(1)
+        self.timer.setInterval(300)
         
         
         # ==================================================
@@ -110,6 +142,47 @@ class Ventana(QWidget):
                 self.estado_pickers[picker.id] = "Libre"
 
             actual_picker = actual_picker.nextNode
+
+
+    # def color_zona(self, zona):
+
+    #     colores = [
+    #         QColor(180, 120, 220),
+    #         QColor(230, 190, 80),
+    #         QColor(80, 180, 200),
+    #         QColor(220, 120, 120),
+    #         QColor(120, 200, 120)
+    #     ]
+
+    #     if zona is None:
+    #         return QColor("black")
+
+    #     return colores[
+    #         (zona - 1) % len(colores)
+    #     ]
+    
+    def color_zona(self, zona):
+
+        if zona is None:
+            return QColor("black")
+
+        cantidad_zonas = len(self.zonas_espectrales)
+
+        if cantidad_zonas == 0:
+            return QColor("black")
+
+        #Distribuyo los colores alrededor del circulo HSV
+        tono = int(
+            ((zona - 1) * 359)
+            / cantidad_zonas
+        )
+
+        return QColor.fromHsv(
+            tono,
+            180,
+            220
+        )
+
 
     def formatear_evento(self, evento):
 
@@ -671,6 +744,28 @@ class Ventana(QWidget):
                         #Tamaño de la caja
                         tamano_producto = min(self.escala // 2, 18)
 
+                        zona = self.zona_producto.get(
+                            producto.id
+                        )
+
+                        if zona is not None:
+
+                            color = self.color_zona(zona)
+
+                            painter.setPen(
+                                QPen(color, 3)
+                            )
+
+                            painter.setBrush(
+                                QBrush()
+                            )
+
+                            painter.drawRect(
+                                xp + 1,
+                                yp + 1,
+                                self.escala - 2,
+                                self.escala - 2
+                            )
                         #Dibujo la imagen del producto centrada en la celda
                         painter.drawPixmap(
                             xp + (self.escala - tamano_producto) // 2,
@@ -779,9 +874,47 @@ config = load_config("src/data/escenario_grande.json")
 #Construyo el warehouse
 warehouse = build_warehouse(config)
 
-#Creo las waves a partir de los pedidos
+# ==================================================
+# CLUSTERING ESPECTRAL
+# ==================================================
+
+K_ZONAS = 5
+METRICA = "t"
+
+zonas_espectrales = cs.main(
+    warehouse=warehouse,
+    k_zones=K_ZONAS,
+    metric=METRICA
+)
+
+
+print("\n===== ZONAS PARA LA INTERFAZ =====")
+
+for numero_zona, zona in enumerate(zonas_espectrales, start=1):
+
+    print("Zona", numero_zona, ":")
+
+    for producto in zona:
+        print(
+            "   ",
+            producto.id,
+            "(" + str(producto.x) + "," + str(producto.y) + ")"
+        )
+
+# ==================================================
+# GENERACION DE WAVES ACTUAL
+# ==================================================
+
+# Estrategia para agrupar pedidos usando los centroides de sus productos
+selector = ProductCentroidSelector(
+    warehouse,
+    warehouse.orders
+)
+
+# Construyo las waves utilizando esa estrategia
 waves, rejected = WaveBuilder(
     warehouse,
+    selector=selector,
     pickers=warehouse.pickers
 ).build()
 
@@ -793,7 +926,7 @@ simulation = Simulation(
 )
 
 #Creo la ventana y le paso el warehouse y la simulacion
-ventana = Ventana(warehouse, simulation)
+ventana = Ventana(warehouse, simulation, zonas_espectrales)
 
 ventana.showMaximized()
 

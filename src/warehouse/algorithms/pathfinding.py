@@ -49,6 +49,80 @@ class SearchResult:
     def target(self):
         return self.path.tail.value if self.path.tail else None
 
+def bfs_distances_targeted(graph, source, targets, blocked=None):
+
+    size = _table_size(graph)
+
+    ids = _target_ids(targets)
+    goal = _target_set(ids, size)
+
+    #Cantidad de objetivos distintos
+    total_targets = len(set(ids))
+
+    steps = Dictionary(size)
+    insert(steps, 0, source)
+
+    queue = Queue()
+    queue.enqueue(source)
+
+    found_count = 0
+
+    #Guardo solamente las distancias a los objetivos
+    target_distances = Dictionary(size)
+
+    #El origen podria ser uno de los objetivos
+    if search(goal, source) is not None:
+        insert(target_distances, 0, source)
+        found_count += 1
+
+    while not queue.is_empty() and found_count < total_targets:
+
+        current = queue.dequeue()
+
+        neighbor_list = neighbors(graph, current)
+
+        step = neighbor_list.head
+
+        while step is not None:
+
+            if step.value is None or not isinstance(step.value, tuple):
+                step = step.nextNode
+                continue
+
+            nxt = step.value[0]
+
+            current_steps = search(steps, current)
+
+            if (
+                search(steps, nxt) is not None
+                or _is_blocked(blocked, nxt)
+                or current_steps is None
+            ):
+                step = step.nextNode
+                continue
+
+            new_distance = current_steps + 1
+
+            insert(steps, new_distance, nxt)
+
+            if search(goal, nxt) is not None:
+
+                insert(
+                    target_distances,
+                    new_distance,
+                    nxt
+                )
+
+                found_count += 1
+
+                if found_count >= total_targets:
+                    break
+
+            queue.enqueue(nxt)
+
+            step = step.nextNode
+
+    return target_distances
 
 def _table_size(graph: WeightedDirectedGraph) -> int:
     """Tamaño total del warehouse.
