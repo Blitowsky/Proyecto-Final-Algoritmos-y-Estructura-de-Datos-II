@@ -35,6 +35,7 @@ class Order:
         self.total_weight: float = 0.0
         self.state: str = "PENDIENTE"
         self.wave = None
+        self.peso_restante: float = 0.0
 
     def add_line(self, product: Product, qty: int) -> None:
         if self.state != "PENDIENTE":
@@ -55,9 +56,12 @@ class Order:
         self.line_count += 1
         self.total_units += qty
         self.total_weight += line.weight
+        self.peso_restante += line.weight
         
     def _move(self, expected: str, new: str) -> None:
         if self.state == "PREPARADO":
+            self.state = new
+        elif self.state == "EN_PREPARACION":
             self.state = new
         elif self.state != expected:
             raise ValueError(f"El pedido {self.id} está {self.state}, debe ser {expected} antes de poder ser {new}.")

@@ -776,7 +776,7 @@ class Ventana(QWidget):
 app = QApplication(sys.argv)
 
 #Cargo el escenario
-config = load_config("src/data/escenario_grande.json")
+config = load_config("src/data/escenario_grande_mod.json")
 
 #Construyo el warehouse
 warehouse, noValido = build_warehouse(config)

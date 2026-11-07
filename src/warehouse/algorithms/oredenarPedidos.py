@@ -11,6 +11,7 @@ def ordenarPedidos(ordenes):
         currentNodeLineB = nodeLine.nextNode  
         centro = centroide(currentNodeLineA)
         while currentNodeLineB is not None and currentNodeLineA is not None:
+
             disX = abs(currentNodeLineA.value.product.x - currentNodeLineB.value.product.x)
             disY = abs(currentNodeLineA.value.product.y - currentNodeLineB.value.product.y)
             disManhattan = disX + disY
@@ -43,10 +44,6 @@ def ordenarPedidos(ordenes):
             nodeLine=nodeOrder.value.lines.head
 
     pedidosPonderados.sort(key=lambda x: x[1], reverse=True)
-    
-# prueba de valores
-#    for pedido, val, cen in pedidosPonderados:
-#        print(pedido.id+" tiene val: "+ str(val)+ " su centro es: "+ str(cen[:]))
 
     return pedidosPonderados
 

@@ -37,7 +37,7 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
                 order.add_line(product, item["cantidad"])
             else:
                 noValido.append(product.id)
-                print(f"No se puede agregar el pedido {pid} por reservado mas qty es: {product.reserved + item["cantidad"]} y la cantidad es {product.stock}")
+                print(f"No se puede agregar al pedido {oid} el producto {pid} porque necesita la cantidad de: {product.reserved + item["cantidad"]} y la cantidad actual es: {product.stock}")
             
 
         add(orders, order)

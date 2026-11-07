@@ -10,11 +10,11 @@ from warehouse.services.wave_runner import process_pending
 from warehouse.simulation.simulation import Simulation
 from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
-from warehouse.algorithms.generacioWave import generacionWaves
+from warehouse.algorithms.generacioWave import generacionWaves, generacionWavesPruebas
 from warehouse.persistence.save_load import load, save
 
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande_mod.json")
-"""
+
 config = load_config(SCENARIO)
 warehouse, noValido = build_warehouse(config)
 
@@ -35,7 +35,7 @@ def picker_current_cells(warehouse):
             add(cells, picker.value.node)
         picker = picker.nextNode
     return cells
-"""
+
 """
 def test_grid(floor):
     rows = render_rows(floor, picker_start_cells(config, floor))
@@ -126,9 +126,9 @@ print()
 
 #waves, rejected = WaveBuilder(warehouse, pickers=warehouse.pickers).build()
 
-"""
 
-waves= generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
+
+waves= generacionWavesPruebas(warehouse.orders, warehouse.pickers, warehouse.wave_config)
 
 wavesWareHouse = LinkedList()
 for wave in waves:
@@ -136,7 +136,7 @@ for wave in waves:
         add(wavesWareHouse,w)
 warehouse.waves=wavesWareHouse
 
-
+"""
 for wave in waves:
     print(f"{wave.id} tiene {wave.total_units} ")
     currentLine=wave.lines.head
@@ -144,31 +144,21 @@ for wave in waves:
         print(f"    pedido {currentLine.value.product.id}")
         currentLine = currentLine.nextNode
 
-warehouse=warehouse()
-simulation = Simulation(warehouse)
-
-print("antes de simulacion")
-
-res=input("queres cargar o comenzar uno nuevo ")
-if res == "1":
-    print("a")
-    simulation = load()
-    print("b")
-else:
-    
 """
+
+
     
 simulation = Simulation(
     warehouse,
     algorithm="bfs",
     auto_assign=True
 )
-save(simulation)
 
-simulation = load()
+
+
 
 simulation.run()
-print("despues de simulacion")
+
 print(simulation.summary())
 print()
 """

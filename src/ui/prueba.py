@@ -49,7 +49,7 @@ class Ventana(QWidget):
         self.timer.timeout.connect(self.avanzar_simulacion)
 
         #Tiempo entre ticks
-        self.timer.setInterval(1)
+        self.timer.setInterval(0)
         
         
         # ==================================================

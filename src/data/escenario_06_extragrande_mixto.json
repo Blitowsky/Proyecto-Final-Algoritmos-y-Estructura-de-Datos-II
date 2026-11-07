@@ -32,7 +32,7 @@
         "ancho": 5,
         "alto": 2,
         "puerta_id": "PUERTA_OUT_1",
-        "peso_max_kg": 800.0
+        "peso_max_kg": 8000.0
       },
       {
         "id": "ZONA_B",
@@ -43,7 +43,7 @@
         "ancho": 5,
         "alto": 2,
         "puerta_id": "PUERTA_IN_1",
-        "peso_max_kg": 800.0
+        "peso_max_kg": 8000.0
       }
     ],
     "racks": [
@@ -430,7 +430,7 @@
         "x": 1,
         "y": 4
       },
-      "capacidad_carga_kg": 150.0
+      "capacidad_carga_kg": 15.0
     },
     {
       "id": "PK_02",
@@ -438,7 +438,7 @@
         "x": 15,
         "y": 4
       },
-      "capacidad_carga_kg": 150.0
+      "capacidad_carga_kg": 65.0
     },
     {
       "id": "PK_03",
@@ -446,7 +446,7 @@
         "x": 30,
         "y": 4
       },
-      "capacidad_carga_kg": 150.0
+      "capacidad_carga_kg": 45.0
     },
     {
       "id": "PK_04",
@@ -454,7 +454,7 @@
         "x": 44,
         "y": 4
       },
-      "capacidad_carga_kg": 150.0
+      "capacidad_carga_kg": 25.0
     },
     {
       "id": "PK_05",
@@ -462,7 +462,7 @@
         "x": 59,
         "y": 4
       },
-      "capacidad_carga_kg": 150.0
+      "capacidad_carga_kg": 35.0
     },
     {
       "id": "PK_06",
@@ -470,7 +470,7 @@
         "x": 74,
         "y": 4
       },
-      "capacidad_carga_kg": 150.0
+      "capacidad_carga_kg": 51.0
     }
   ],
   "productos": [
