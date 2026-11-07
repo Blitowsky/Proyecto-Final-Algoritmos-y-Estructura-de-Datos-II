@@ -239,6 +239,8 @@ class Simulation:
             except ValueError:
                 if len(self.walkers) == 0 and len(free_picks) == length(self.warehouse.pickers):
                     raise
+                if getattr(wave.value, "planned_shares", None) is not None:
+                    return
             wave = wave.nextNode
 
     def _start_assigned(self, out: list[Event]) -> None:
@@ -307,13 +309,17 @@ class Simulation:
                     weight += item.value.weight
                     count += 1
                 item = item.nextNode
+            detail = f"{count} productos, {round(weight, 3)}kg"
+            completed = getattr(leg, "completed_orders", None)
+            if completed:
+                detail += f" | pedidos listos: {', '.join(str(o.id) for o in completed)}"
             out.append(Event(
                 self.tick,
                 picker.id,
                 "drop",
                 current,
                 None,
-                f"{count} productos, {round(weight, 3)}kg"
+                detail   
             ))
 
     def _refused(

@@ -183,10 +183,25 @@ def assign_wave(
     if len(candidates) == 0:
         raise ValueError(f"No hay pickers libres para la wave {wave.id}.")
 
-    parts = split_load(merge_lines(wave.lines), candidates)
-    if parts is None:
-        raise ValueError(f"Los {wave.total_weight}kg de la wave {wave.id} no pueden ser cargados por los pickers disponibles: " +
-        ", ".join(str(p.id) + " " + str(p.remaining()) + "kg" for p in candidates))
+    if getattr(wave, "planned_shares", None) is not None:
+        free_by_id = {p.id: p for p in candidates}
+        parts = []
+        for planned_picker, planned_lines in wave.planned_shares:
+            if planned_picker.id not in free_by_id:
+                raise ValueError(
+                    f"El picker {planned_picker.id} planificado para la wave {wave.id} aún no está libre."
+                )
+            share_weight = sum(l.product.weight * l.qty for l in planned_lines)
+            if not planned_picker.fits(share_weight):
+                raise ValueError(
+                    f"El picker {planned_picker.id} no puede cargar los {share_weight}kg planificados en la wave {wave.id}."
+                )
+            parts.append((planned_picker, [PickLine(l.product, l.qty) for l in planned_lines]))
+    else:
+        parts = split_load(merge_lines(wave.lines), candidates)
+        if parts is None:
+            raise ValueError(f"Los {wave.total_weight}kg de la wave {wave.id} no pueden ser cargados por los pickers disponibles: " +
+            ", ".join(str(p.id) + " " + str(p.remaining()) + "kg" for p in candidates))
 
     try:
         for picker, shares in parts:

@@ -309,7 +309,63 @@ def _best_first(
                 queue.push(new_cost + (0 if heuristic is None else heuristic(nxt)), nxt)
             step = step.nextNode
     return None
-                
+
+def bfs_distances_targeted(graph, source, targets, blocked=None):
+    size = _table_size(graph)
+    ids = _target_ids(targets)
+    goal = _target_set(ids, size)
+    total_targets = len(set(ids))   # únicos, no repetidos
+    steps = Dictionary(size)
+    insert(steps, 0, source)
+
+    queue = Queue()
+    queue.enqueue(source)
+
+    # Llevamos la cuenta de cuántos objetivos hemos encontrado para poder cortar antes
+    found_count = 0
+
+    # Diccionario exclusivo para retornar solo los resultados de los objetivos
+    target_distances = Dictionary(size)
+
+    # Si el origen es un objetivo, lo registramos inmediatamente
+    if search(goal, source) is not None:
+        insert(target_distances, 0, source)
+        found_count += 1
+
+    while not queue.is_empty() and found_count < total_targets:
+        current = queue.dequeue()
+        neighbor_list = neighbors(graph, current)
+        step = neighbor_list.head
+
+        while step is not None:
+            if step.value is None or not isinstance(step.value, tuple):
+                step = step.nextNode
+                continue
+
+            nxt = step.value[0]
+            current_steps = search(steps, current)
+
+            if search(steps, nxt) is not None or _is_blocked(blocked, nxt) or current_steps is None:
+                step = step.nextNode
+                continue
+
+            new_distance = current_steps + 1
+            insert(steps, new_distance, nxt)
+
+            # Si el vecino es uno de los objetivos, guardamos su distancia en el diccionario de retorno
+            if search(goal, nxt) is not None:
+                insert(target_distances, new_distance, nxt)
+                found_count += 1
+
+                # Si ya encontramos todos, podemos romper el bucle interno
+                if found_count >= total_targets:
+                    break
+
+            queue.enqueue(nxt)
+            step = step.nextNode
+
+    return target_distances          
+
 def dijkstra_path(
     graph: WeightedDirectedGraph,
     source: int,
