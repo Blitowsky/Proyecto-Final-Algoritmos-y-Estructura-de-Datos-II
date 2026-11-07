@@ -133,6 +133,7 @@ def perform_leg_action(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
             if line.value is None:
                 line = line.nextNode
                 continue
+    #        print(f"{line.value.product.id} y {line.value.qty}")
             add(leg.items, picker.pick(line.value.product, line.value.qty))
             line = line.nextNode
     elif leg.kind == "return":

@@ -6,10 +6,19 @@ class OrderLine:
     def __init__(self, product: Product, qty: int) -> None:
         self.product: Product = product
         self.qty: int = qty
+        self.usado: int = 0
 
     @property
     def weight(self) -> float:
         return self.product.weight * self.qty
+
+    @property
+    def weightRestante(self) -> float:
+        return self.product.weight * (self.qty - self.usado)
+
+    @property
+    def resto(self) -> int:
+        return self.qty - self.usado
 
 class Order:
     def __init__(self, order_id: str, priority: int) -> None:
@@ -48,7 +57,9 @@ class Order:
         self.total_weight += line.weight
         
     def _move(self, expected: str, new: str) -> None:
-        if self.state != expected:
+        if self.state == "PREPARADO":
+            self.state = new
+        elif self.state != expected:
             raise ValueError(f"El pedido {self.id} está {self.state}, debe ser {expected} antes de poder ser {new}.")
         self.state = new
 

@@ -572,7 +572,7 @@
         "x": 45,
         "y": 4
       },
-      "capacidad_carga_kg": 120.0
+      "capacidad_carga_kg": 150.0
     },
     {
       "id": "PK_03",
@@ -580,7 +580,7 @@
         "x": 30,
         "y": 32
       },
-      "capacidad_carga_kg": 100.0
+      "capacidad_carga_kg": 150.0
     },
     {
       "id": "PK_04",
@@ -588,7 +588,7 @@
         "x": 5,
         "y": 17
       },
-      "capacidad_carga_kg": 80.0
+      "capacidad_carga_kg": 150.0
     }
   ],
   "productos": [
