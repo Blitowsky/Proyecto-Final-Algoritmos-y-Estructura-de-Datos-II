@@ -48,9 +48,9 @@ class Picker:
         weight = None
         edge = graph.dictionary[graph.hash_func(self.node)].head
         while edge is not None:
-            if isinstance(edge.value, tuple):
-                if edge.value[0] == next_id:
-                    weight = edge.value[1]
+            if isinstance(edge.value, tuple) and isinstance(edge.value[1], tuple):
+                if edge.value[1][0] == next_id:
+                    weight = edge.value[1][1]
             edge = edge.nextNode
 
         if weight is None:
@@ -83,6 +83,8 @@ class Picker:
         item = PickedItem(product, qty)
         add(self.carried, item)
         self.load += extra
+        if product.stock is not None:
+            product.stock -= qty
         return item
 
 
@@ -121,7 +123,21 @@ class Picker:
         self.load = 0.0
         return dropped
 
+    @staticmethod
+    def _return_to_stock(items: LinkedList) -> None:
+        item = items.head
+        while item is not None:
+            if item.value is None:
+                item = item.nextNode
+                continue
+            product = item.value.product
+            if product.stock is not None:
+                product.stock += item.value.qty
+            item = item.nextNode
+
     def reset(self) -> None:
+        self._return_to_stock(self.carried)
+        self._return_to_stock(self.delivered)
         self.node = self.start_node
         self.load = 0.0
         self.carried = LinkedList()
