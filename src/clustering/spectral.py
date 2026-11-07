@@ -197,7 +197,7 @@ def kmeans_espectral(k: int, spectral_embedding: np.ndarray):
     compr = True
     i = 0
 
-    while compr:
+    while compr and i < 100:
         data["centroid"], iter_error = assign_centroid(data, centroids)
         error.append(sum(iter_error))
         centroids = data.groupby("centroid").agg("mean").reset_index(drop=True)
@@ -216,50 +216,61 @@ def kmeans_espectral(k: int, spectral_embedding: np.ndarray):
 # =====================================================================
 def main(
     warehouse: WareHouse,
-    k_zones: int | None = None,
+    k_zones: int = 4,
     metric: str = "t"
-) -> list[list[tuple[int, int]]]:
+) -> list[list[Product]]:
     """
     Orquesta el proceso completo de Clustering Espectral sobre el Warehouse:
       1. Extrae los productos de los pedidos pendientes.
-      2. Determina la cantidad de zonas K (por defecto, la cantidad de pickers).
+      2. Usa la cantidad de zonas K configurada (independiente de la cantidad de pickers).
       3. Ejecuta los 5 pasos del Clustering Espectral.
-      4. Imprime el resumen legible por consola y retorna la lista de listas de coordenadas (x,y).
+      4. Imprime el resumen legible por consola y retorna la lista de productos por zona.
     """
+    if isinstance(k_zones, bool) or not isinstance(k_zones, int) or k_zones < 1:
+        raise ValueError("El número de zonas 'k_zones' debe ser un entero positivo mayor o igual a 1.")
+
     products = extract_pending_products(warehouse)
     if not products:
         print("[Clustering Espectral] No hay productos en pedidos pendientes.")
         return []
 
-    # Si no se especifica k_zones, usamos la cantidad de pickers disponibles en el Warehouse
-    if k_zones is None:
-        k_zones = max(1, length(warehouse.pickers))
-    k_zones = min(k_zones, len(products))
+    k_effective = min(k_zones, len(products))
 
-    # Ejecución secuencial de los 5 pasos
-    dist_matrix = build_distance_matrix(products, metric=metric, warehouse=warehouse)
-    sim_matrix = build_similarity_matrix(dist_matrix)
-    laplacian = compute_laplacian_matrix(sim_matrix, normalized=True)
-    eigenvectors = compute_eigenvectors(laplacian, k_zones)
-    embedding = create_spectral_embedding(eigenvectors)
-    labels, _, _ = kmeans_espectral(k_zones, embedding)
+    if k_effective == 1:
+        labels = np.zeros(len(products), dtype=int)
+    else:
+        # Ejecución secuencial de los 5 pasos
+        dist_matrix = build_distance_matrix(products, metric=metric, warehouse=warehouse)
+        sim_matrix = build_similarity_matrix(dist_matrix)
+        laplacian = compute_laplacian_matrix(sim_matrix, normalized=True)
+        eigenvectors = compute_eigenvectors(laplacian, k_effective)
+        embedding = create_spectral_embedding(eigenvectors)
+        labels, _, _ = kmeans_espectral(k_effective, embedding)
 
     # Agrupamos tanto las coordenadas (x, y) como los objetos Product para mostrarlos
-    zones_coords: list[list[tuple[int, int]]] = [[] for _ in range(k_zones)]
-    zones_products: list[list[Product]] = [[] for _ in range(k_zones)]
+    zones_coords: list[list[tuple[int, int]]] = [[] for _ in range(k_effective)]
+    zones_products: list[list[Product]] = [[] for _ in range(k_effective)]
 
     for prod, cluster_id in zip(products, labels):
         zones_coords[int(cluster_id)].append((prod.x, prod.y))
         zones_products[int(cluster_id)].append(prod)
 
-    # Impresión limpia de resultados para el test
-    print("=" * 70)
-    print(f" RESULTADO CLUSTERING ESPECTRAL (Métrica: {metric.upper()} | Zonas: {k_zones})")
-    print("=" * 70)
-    for idx, (prod_list, coord_list) in enumerate(zip(zones_products, zones_coords), start=1):
-        nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
-        print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
-        print(f"    Coordenadas (x, y) : {coord_list}")
-    print("=" * 70)
+    # Filtramos zonas vacías en caso de colapso de centroides
+    non_empty = [
+        (p_list, c_list)
+        for p_list, c_list in zip(zones_products, zones_coords)
+        if p_list
+    ]
 
-    return [z for z in zones_coords if z]
+    # Impresión limpia de resultados para el test
+    # print("=" * 70)
+    print(f" RESULTADO CLUSTERING ESPECTRAL (Métrica: {metric.upper()} | Zonas K={len(non_empty)})")
+    # print("=" * 70)
+    # for idx, (prod_list, coord_list) in enumerate(non_empty, start=1):
+    #     nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
+    #     print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
+    #     print(f"    Coordenadas (x, y) : {coord_list}")
+    # print("=" * 70)
+
+    return [p_list for p_list, _ in non_empty]
+

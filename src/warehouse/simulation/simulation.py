@@ -78,6 +78,8 @@ class Simulation:
         self.records: list[Record] = []
         self._asked_to_step_aside: list[tuple[str|None, str|None]] = []
 
+        self.summary_visits: list[tuple[int, int]] = []
+
     @property
     def finished(self) -> bool:
         if len(self.walkers) > 0:
@@ -97,15 +99,15 @@ class Simulation:
                 wave = wave.nextNode
         return True
 
-    def run(self) -> list[Event]:
+    def run(self, with_visits: bool = False) -> list[Event]:
         """Corre hasta que todo esté terminado, retorna el log de eventos."""
         while not self.finished:
             if self.tick >= self.max_ticks:
                 raise Exception(self._stuck_message())
-            self.step()
+            self.step(with_visits)
         return self.events
 
-    def step(self) -> list[Event]:
+    def step(self, with_visits: bool = False) -> list[Event]:
         """Un `tick`. Retorna los eventos `Event` de este tick."""
         self.tick += 1
         out = []
@@ -141,6 +143,8 @@ class Simulation:
                 insert(claimed, True, cell)
             elif kind == "act":
                 acting.append(walker)
+            if with_visits:
+                self.summary_visits.append(self.warehouse.node_xy(walker.picker.node))
 
         stepping_aside = []
         for picker_id, in_the_way_of in self._asked_to_step_aside:
@@ -235,6 +239,8 @@ class Simulation:
             except ValueError:
                 if len(self.walkers) == 0 and len(free_picks) == length(self.warehouse.pickers):
                     raise
+                if getattr(wave.value, "planned_shares", None) is not None:
+                    return
             wave = wave.nextNode
 
     def _start_assigned(self, out: list[Event]) -> None:
@@ -303,13 +309,17 @@ class Simulation:
                     weight += item.value.weight
                     count += 1
                 item = item.nextNode
+            detail = f"{count} productos, {round(weight, 3)}kg"
+            completed = getattr(leg, "completed_orders", None)
+            if completed:
+                detail += f" | pedidos listos: {', '.join(str(o.id) for o in completed)}"
             out.append(Event(
                 self.tick,
                 picker.id,
                 "drop",
                 current,
                 None,
-                f"{count} productos, {round(weight, 3)}kg"
+                detail
             ))
 
     def _refused(
@@ -468,7 +478,8 @@ class Simulation:
             "steps": 0,
             "waits": 0,
             "reroutes": 0,
-            "side_steps": 0
+            "side_steps": 0,
+            "summary_visits": self.summary_visits
         }
 
         for record in self.records:
