@@ -7,7 +7,7 @@ el planificador camina a la más cercana siempre.
 """
 
 from warehouse.structures.linkedlist import LinkedList, add
-
+from warehouse.services.order_service import update_orders_from_deliveries
 from warehouse.domain.route import Leg, Route
 from warehouse.domain.picker import Picker
 from warehouse.domain.warehouse import WareHouse
@@ -161,7 +161,14 @@ def perform_leg_action(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
             line.value.product.release(line.value.qty)
             line = line.nextNode
     elif leg.kind == "return":
-        leg.items = picker.drop_off(warehouse)
+
+        leg.items = picker.drop_off(
+            warehouse
+        )
+
+        leg.completed_orders = update_orders_from_deliveries(
+            warehouse
+        )
 
 def visit(
     picker: Picker,

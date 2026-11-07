@@ -239,6 +239,12 @@ class Simulation:
             except ValueError:
                 if len(self.walkers) == 0 and len(free_picks) == length(self.warehouse.pickers):
                     raise
+                if getattr(
+                    wave.value,
+                    "planned_shares",
+                    None
+                ) is not None:
+                    return
             wave = wave.nextNode
 
     def _start_assigned(self, out: list[Event]) -> None:

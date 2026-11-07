@@ -3,6 +3,7 @@ import math
 import os
 import clustering.spectral as cs
 
+from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
 from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
@@ -77,7 +78,7 @@ class Ventana(QWidget):
         self.timer.timeout.connect(self.avanzar_simulacion)
 
         #Tiempo entre ticks
-        self.timer.setInterval(300)
+        self.timer.setInterval(0)
         
         
         # ==================================================
@@ -906,9 +907,15 @@ for numero_zona, zona in enumerate(zonas_espectrales, start=1):
 # ==================================================
 
 # Estrategia para agrupar pedidos usando los centroides de sus productos
-selector = ProductCentroidSelector(
-    warehouse,
-    warehouse.orders
+# selector = ProductCentroidSelector(
+#     warehouse,
+#     warehouse.orders
+# )
+
+selector = SpectralWaveSelector(
+    warehouse=warehouse,
+    spectral_zones=zonas_espectrales,
+    pickers=warehouse.pickers
 )
 
 # Construyo las waves utilizando esa estrategia

@@ -61,6 +61,8 @@ class Wave:
         self.status: str = "created"
         self.assignments: LinkedList = LinkedList()
         self.assignment_count: int = 0
+        #Reparto de productos previamente decidido por una estrategia
+        self.planned_shares = None
 
     def why_not(self, order: Order) -> str|None:
         if order.state != "PENDIENTE":
@@ -122,6 +124,63 @@ class Wave:
             self.top_priority = order.priority
         order.assign_to(self)
 
+    def add_product_line(self, product: Product, qty: int, priority: int = 0) -> None:
+
+        if isinstance(qty, bool) or not isinstance(qty, int) or qty <= 0:
+            raise ValueError(
+                f"La cantidad del producto {product.id} debe ser un entero positivo."
+            )
+
+        available = product.available
+
+        if available is not None and qty > available:
+            raise ValueError(
+                f"Se pidieron {qty} unidades de {product.id}, "
+                f"pero solo quedan {available} sin reservar."
+            )
+
+        pid = product.id
+
+        product_line = search(
+            self.line_index,
+            pid
+        )
+
+        if product_line is not None and product_line.product.id == pid:
+
+            product_line.qty += qty
+
+        else:
+
+            wave_line = WaveLine(
+                product,
+                qty
+            )
+
+            add(
+                self.lines,
+                wave_line
+            )
+
+            insert(
+                self.line_index,
+                wave_line,
+                pid
+            )
+
+            self.product_count += 1
+
+        self.total_units += qty
+
+        self.total_weight += (
+            product.weight * qty
+        )
+
+        if priority > self.top_priority:
+            self.top_priority = priority
+
+        product.reserve(qty)
+    
     def release_stock(self) -> None:
         line = self.lines.head
         while line is not None:
