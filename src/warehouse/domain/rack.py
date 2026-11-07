@@ -1,3 +1,11 @@
+"""
+Rack: Estantería que almacena productos.
+
+Cada celda unitaria del rectángulo que representa este rack
+contiene una `LinkedList` con productos. Por lo menos una 
+dimension del Rack debe ser `2`.
+"""
+
 from warehouse.structures.linkedlist import LinkedList
 
 from warehouse.domain.rect import Rect

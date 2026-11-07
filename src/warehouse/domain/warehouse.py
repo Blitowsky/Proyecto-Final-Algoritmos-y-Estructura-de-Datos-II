@@ -1,3 +1,8 @@
+"""
+Floor: plan de piso del warehouse, con ubicaciones de cosas fijas.
+WareHouse: `Floor` más estados de waves, pedidos, pickers, etc.
+"""
+
 from warehouse.structures.linkedlist import LinkedList
 from warehouse.structures.dictionary import CloseDictionary, search
 from warehouse.structures.graph import WeightedDirectedGraph
@@ -53,8 +58,8 @@ class WareHouse:
         products: CloseDictionary,
         pickers: LinkedList,
         orders: LinkedList,
-        orders_by_id: CloseDictionary,
-        wave_config: WaveConfig|None
+        orders_by_id: Dictionary,
+        wave_config: WaveConfig
     ) -> None:
         self.floor: Floor = floor
         self.width: int = floor.width
@@ -68,14 +73,18 @@ class WareHouse:
         self.products: CloseDictionary = products
         self.pickers: LinkedList = pickers
         self.orders: LinkedList = orders
-        self.orders_by_id: CloseDictionary = orders_by_id
-        self.wave_config: WaveConfig|None = wave_config
+        self.orders_by_id: Dictionary = orders_by_id
+        self.wave_config: WaveConfig = wave_config
         self.waves: LinkedList = LinkedList()
 
     def node_xy(self, node_id: int) -> tuple[int, int]:
         return node_id % self.width, node_id // self.width
 
     def dropoff_zones_at(self, node_id: int) -> LinkedList|None:
+        """
+        `LinkedList` de las zonas de despacho que tocan el pasillo `node_id`,
+        `None` si no toca ninguna.
+        """
         if search(self.floor.dropoff, node_id) is None:
             return None
         return search(self.floor.dropoff, node_id)
