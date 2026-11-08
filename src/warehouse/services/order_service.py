@@ -1,5 +1,5 @@
 from warehouse.structures.linkedlist import LinkedList, add
-from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, Dictionary, search, insert
 
 from warehouse.domain.order import Order
 from warehouse.persistence.scenario_loader import require_keys, require_id
@@ -24,7 +24,7 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
     """
     order_list = config.get("pedidos", [])
     orders = LinkedList()
-    by_id = Dictionary(2 * len(order_list) + 1)
+    by_id = CloseDictionary(2 * len(order_list) + 1)
 
     for i in range(len(order_list)):
         o = order_list[i]
@@ -54,3 +54,84 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
         insert(by_id, order, oid)
 
     return orders, by_id
+
+def update_orders_from_deliveries(warehouse) -> list[Order]:
+    """Actualiza el estado de avance de los pedidos a partir de los productos
+    efectivamente entregados en las zonas de despacho (cuando las waves se
+    arman por productos y no por pedidos completos).
+
+    Retorna la lista de pedidos que pasaron a `PREPARADO` en esta actualización.
+    """
+    delivered: dict = {}
+    z_node = warehouse.zones.head
+    while z_node is not None:
+        zone = z_node.value
+        if zone is not None and zone.is_outbound:
+            item_node = zone.items.head
+            while item_node is not None:
+                item = item_node.value
+                if item is not None and item.product is not None:
+                    pid = item.product.id
+                    delivered[pid] = delivered.get(pid, 0) + item.qty
+                item_node = item_node.nextNode
+        z_node = z_node.nextNode
+
+    if not delivered:
+        return []
+
+    unlinked_orders: list[Order] = []
+    o_node = warehouse.orders.head
+    while o_node is not None:
+        order = o_node.value
+        if order is not None and order.wave is None:
+            if order.state == "PREPARADO":
+                line_node = order.lines.head
+                while line_node is not None:
+                    if line_node.value is not None:
+                        pid = line_node.value.product.id
+                        delivered[pid] = max(0, delivered.get(pid, 0) - line_node.value.qty)
+                    line_node = line_node.nextNode
+            else:
+                unlinked_orders.append(order)
+        o_node = o_node.nextNode
+
+    unlinked_orders.sort(key=lambda o: (-o.priority, str(o.id)))
+
+    completed_now: list[Order] = []
+    for order in unlinked_orders:
+        can_complete = True
+        any_available = False
+        line_node = order.lines.head
+        while line_node is not None:
+            line = line_node.value
+            if line is not None:
+                avail = delivered.get(line.product.id, 0)
+                if avail > 0:
+                    any_available = True
+                if avail < line.qty:
+                    can_complete = False
+            line_node = line_node.nextNode
+
+        if can_complete:
+            line_node = order.lines.head
+            while line_node is not None:
+                line = line_node.value
+                if line is not None:
+                    pid = line.product.id
+                    delivered[pid] -= line.qty
+                line_node = line_node.nextNode
+
+            if order.state == "PENDIENTE":
+                order.assign_to(None)
+            if order.state == "EN_WAVE":
+                order.start_preparation()
+            if order.state == "EN_PREPARACION":
+                order.finish()
+            completed_now.append(order)
+        elif any_available:
+            if order.state == "PENDIENTE":
+                order.assign_to(None)
+            if order.state == "EN_WAVE":
+                order.start_preparation()
+
+    return completed_now

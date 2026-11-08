@@ -263,14 +263,14 @@ def main(
     ]
 
     # Impresión limpia de resultados para el test
-    # print("=" * 70)
+    print("=" * 70)
     print(f" RESULTADO CLUSTERING ESPECTRAL (Métrica: {metric.upper()} | Zonas K={len(non_empty)})")
-    # print("=" * 70)
-    # for idx, (prod_list, coord_list) in enumerate(non_empty, start=1):
-    #     nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
-    #     print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
-    #     print(f"    Coordenadas (x, y) : {coord_list}")
-    # print("=" * 70)
+    print("=" * 70)
+    for idx, (prod_list, coord_list) in enumerate(non_empty, start=1):
+        nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
+        print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
+        print(f"    Coordenadas (x, y) : {coord_list}")
+    print("=" * 70)
 
     return [p_list for p_list, _ in non_empty]
 

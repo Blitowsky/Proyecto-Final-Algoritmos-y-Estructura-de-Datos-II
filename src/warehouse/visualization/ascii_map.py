@@ -1,4 +1,4 @@
-from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, search, insert
 from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 from warehouse.domain.direction import N, S, E, O, AMBOS
 
@@ -20,7 +20,7 @@ def render_rows(floor, marks=None):
     Returns one string per row, from y = height-1 (first) down to y = 0 (last).
     marks: optional LinkedList of cell ids to draw as K (for example the pickers' start cells).
     """
-    marked = Dictionary(floor.width * floor.height)  # cell id -> True, only used while drawing
+    marked = CloseDictionary(floor.width * floor.height)  # cell id -> True, only used while drawing
     if marks is not None:
         cid = marks.head
         while cid is not None:
