@@ -5,7 +5,7 @@ import clustering.spectral as cs
 
 from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
 from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit, QDialog, QVBoxLayout, QComboBox, QSpinBox, QDialogButtonBox
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
@@ -19,6 +19,166 @@ from warehouse.domain.direction import N, S, E, O, AMBOS
 #Tipos de celdas que puede tener el warehouse
 from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 
+class DialogoEstrategia(QDialog):
+
+    def __init__(self, max_zonas):
+
+        super().__init__()
+
+        self.setWindowTitle(
+            "Configuracion de estrategia"
+        )
+
+        self.setMinimumWidth(350)
+
+        #Layout vertical del dialogo
+        layout = QVBoxLayout(self)
+
+
+        # ==================================================
+        # ESTRATEGIA
+        # ==================================================
+
+        layout.addWidget(
+            QLabel("Estrategia de generacion de Waves:")
+        )
+
+        self.combo_estrategia = QComboBox()
+
+        #El segundo valor queda guardado internamente
+        self.combo_estrategia.addItem(
+            "Centroide",
+            "centroide"
+        )
+
+        self.combo_estrategia.addItem(
+            "Clustering espectral",
+            "clustering"
+        )
+
+        layout.addWidget(
+            self.combo_estrategia
+        )
+
+
+        # ==================================================
+        # CANTIDAD DE ZONAS K
+        # ==================================================
+
+        layout.addWidget(
+            QLabel("Cantidad de zonas (K):")
+        )
+
+        self.spin_k = QSpinBox()
+
+        self.spin_k.setMinimum(1)
+
+        self.spin_k.setMaximum(
+            max(1, max_zonas)
+        )
+
+        self.spin_k.setValue(
+            min(4, max(1, max_zonas))
+        )
+
+        layout.addWidget(
+            self.spin_k
+        )
+
+
+        # ==================================================
+        # METRICA
+        # ==================================================
+
+        layout.addWidget(
+            QLabel("Metrica del clustering:")
+        )
+
+        self.combo_metrica = QComboBox()
+
+        self.combo_metrica.addItem(
+            "Topologica",
+            "t"
+        )
+
+        self.combo_metrica.addItem(
+            "Euclidiana",
+            "e"
+        )
+
+        layout.addWidget(
+            self.combo_metrica
+        )
+
+
+        # ==================================================
+        # BOTONES
+        # ==================================================
+
+        self.botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+
+        #Si toca OK cierro aceptando
+        self.botones.accepted.connect(
+            self.accept
+        )
+
+        #Si toca Cancelar cierro rechazando
+        self.botones.rejected.connect(
+            self.reject
+        )
+
+        layout.addWidget(
+            self.botones
+        )
+
+
+        # ==================================================
+        # CAMBIO DE ESTRATEGIA
+        # ==================================================
+
+        self.combo_estrategia.currentIndexChanged.connect(
+            self.actualizar_opciones
+        )
+
+        self.actualizar_opciones()
+
+
+    def actualizar_opciones(self):
+
+        #Obtengo el valor interno del combo
+        estrategia = self.combo_estrategia.currentData()
+
+        #K y metrica solo tienen sentido para clustering
+        usa_clustering = (
+            estrategia == "clustering"
+        )
+
+        self.spin_k.setEnabled(
+            usa_clustering
+        )
+
+        self.combo_metrica.setEnabled(
+            usa_clustering
+        )
+
+
+    def estrategia(self):
+
+        return self.combo_estrategia.currentData()
+
+
+    def k_zonas(self):
+
+        return self.spin_k.value()
+
+
+    def metrica(self):
+
+        return self.combo_metrica.currentData()
 
 class Ventana(QWidget):
 
@@ -875,65 +1035,115 @@ config = load_config("src/data/escenario_grande.json")
 #Construyo el warehouse
 warehouse = build_warehouse(config)
 
+
 # ==================================================
-# CLUSTERING ESPECTRAL
+# CONFIGURACION DE ESTRATEGIA
 # ==================================================
 
-K_ZONAS = 5
-METRICA = "t"
-
-zonas_espectrales = cs.main(
-    warehouse=warehouse,
-    k_zones=K_ZONAS,
-    metric=METRICA
+#Obtengo los productos considerados por el clustering
+productos_clustering = cs.extract_pending_products(
+    warehouse
 )
 
+#Creo el dialogo y establezco el maximo de zonas
+dialogo = DialogoEstrategia(
+    max_zonas=max(1, len(productos_clustering))
+)
 
-print("\n===== ZONAS PARA LA INTERFAZ =====")
+#Muestro el dialogo y espero la eleccion del usuario
+resultado = dialogo.exec()
 
-for numero_zona, zona in enumerate(zonas_espectrales, start=1):
+#Si el usuario cancela, termina el programa
+if resultado != QDialog.DialogCode.Accepted:
+    sys.exit(0)
 
-    print("Zona", numero_zona, ":")
 
-    for producto in zona:
-        print(
-            "   ",
-            producto.id,
-            "(" + str(producto.x) + "," + str(producto.y) + ")"
+#Obtengo la estrategia elegida
+estrategia = dialogo.estrategia()
+
+#Por defecto no tenemos zonas espectrales
+zonas_espectrales = None
+
+
+# ==================================================
+# ESTRATEGIA CENTROIDE
+# ==================================================
+
+if estrategia == "centroide":
+
+    print("Estrategia seleccionada: Centroide")
+
+    selector = ProductCentroidSelector(
+        warehouse,
+        warehouse.orders
+    )
+
+
+# ==================================================
+# ESTRATEGIA CLUSTERING ESPECTRAL
+# ==================================================
+
+elif estrategia == "clustering":
+
+    #Obtengo las opciones elegidas por el usuario
+    K_ZONAS = dialogo.k_zonas()
+    METRICA = dialogo.metrica()
+
+    print("Estrategia seleccionada: Clustering espectral")
+    print("K:", K_ZONAS)
+    print("Metrica:", METRICA)
+
+    if not productos_clustering:
+        raise ValueError(
+            "No hay productos en pedidos pendientes para clusterizar."
         )
 
+    #Calculo las zonas
+    zonas_espectrales = cs.main(
+        warehouse=warehouse,
+        k_zones=K_ZONAS,
+        metric=METRICA
+    )
+
+    #Creo el selector espectral
+    selector = SpectralWaveSelector(
+        warehouse=warehouse,
+        spectral_zones=zonas_espectrales,
+        pickers=warehouse.pickers
+    )
+
+
 # ==================================================
-# GENERACION DE WAVES ACTUAL
+# GENERACION DE WAVES
 # ==================================================
 
-# Estrategia para agrupar pedidos usando los centroides de sus productos
-# selector = ProductCentroidSelector(
-#     warehouse,
-#     warehouse.orders
-# )
-
-selector = SpectralWaveSelector(
-    warehouse=warehouse,
-    spectral_zones=zonas_espectrales,
-    pickers=warehouse.pickers
-)
-
-# Construyo las waves utilizando esa estrategia
 waves, rejected = WaveBuilder(
     warehouse,
     selector=selector,
     pickers=warehouse.pickers
 ).build()
 
-#Creo la simulacion
+
+# ==================================================
+# SIMULACION
+# ==================================================
+
 simulation = Simulation(
     warehouse,
     algorithm="bfs",
     auto_assign=True
 )
 
-#Creo la ventana y le paso el warehouse y la simulacion
-ventana = Ventana(warehouse, simulation, zonas_espectrales)
+
+# ==================================================
+# INTERFAZ GRAFICA
+# ==================================================
+
+ventana = Ventana(
+    warehouse,
+    simulation,
+    zonas_espectrales
+)
 
 ventana.showMaximized()
 
