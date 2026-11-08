@@ -760,13 +760,27 @@ config = load_config(SCENARIO)
 #Construyo el warehouse
 warehouse = build_warehouse(config)
 
-selector = ProductCentroidSelector(warehouse, warehouse.orders)
+
+K_ZONAS = 4
+
+zonas_espectrales = cs.main(
+    warehouse=warehouse,
+    k_zones=K_ZONAS,
+    metric="t"
+)
+
+
+selector = SpectralWaveSelector(
+    warehouse=warehouse,
+    spectral_zones=zonas_espectrales,
+    pickers=warehouse.pickers
+)
 waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
 
 #Creo la simulacion
 simulation = Simulation(
     warehouse,
-    algorithm="astar",
+    algorithm="bfs",
     auto_assign=True
 )
 

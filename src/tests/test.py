@@ -42,87 +42,7 @@ def test_grid(floor):
 test_grid(warehouse.floor)
 print()
 
-# warehouse.graph.printGraph()
 
-# 55 (picker) -> (1, 3); 92 -> (2, 5); 177 -> (15, 9); 95 -> (5, 5) 
-# picker0 = warehouse.pickers.head.value
-# targets = LinkedList()
-# # add(targets, 177)
-# add(targets, 95)
-# path_bfs = find_path(warehouse, 55, targets, "bfs")
-# path_dijkstra = find_path(warehouse, 55, targets, "dijkstra")
-# path_astar = find_path(warehouse, 55, targets, "astar")
-#
-# print("BFS:")
-# if path_bfs:
-#     print(f"Expanded: {path_bfs.expanded}; Examined: {path_bfs.examined}; Nodes: {path_bfs.nodes}")
-#     node = path_bfs.path.head
-#     while node is not None:
-#         if node.value:
-#             print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#         node = node.nextNode
-#     print("None")
-# print("DIJKSTRA:")
-# if path_dijkstra:
-#     print(f"Expanded: {path_dijkstra.expanded}; Examined: {path_dijkstra.examined}; Nodes: {path_dijkstra.nodes}")
-#     node = path_dijkstra.path.head
-#     while node is not None:
-#         if node.value:
-#             print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#         node = node.nextNode
-#     print("None")
-# print("A*:")
-# if path_astar:
-#     print(f"Expanded: {path_astar.expanded}; Examined: {path_astar.examined}; Nodes: {path_astar.nodes}")
-#     node = path_astar.path.head
-#     while node is not None:
-#         if node.value:
-#             print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#         node = node.nextNode
-#     print("None")
-# print()
-#
-# route = move_picker(picker0, warehouse, targets, "astar")
-# picker0_node = LinkedList()
-# add(picker0_node, picker0.node)
-# print(render_map(warehouse.floor, picker0_node))
-
-# waves, rejected = process_pending(warehouse)
-# print("WAVES: ")
-# for wave in list(waves):
-#     if wave is None:
-#         continue
-#     print(f"Wave {wave.id} ({wave.status})")
-#     print(f"Orders: {", ".join([o.id for o in list(wave.orders)])}")
-#     for line in list(wave.lines):
-#         if line is None:
-#             continue
-#         x = line.product.cell.x
-#         y = line.product.cell.y
-#         z = line.product.z
-#         print(f"{line.product.id}; {line.product.weight}kg ({line.qty}) <{x}, {y}, {z}>")
-#     print("Assignments:")
-#     for i, assignment in enumerate(list(wave.assignments)):
-#         if assignment is None:
-#             continue
-#         print(f"Assignment {i}; picker {assignment.picker.id} ({assignment.picker.capacity}kg); dispatch zone {assignment.zone.id}:")
-#         for leg in list(assignment.route.legs):
-#             if leg is None:
-#                 continue
-#             node = leg.path.head
-#             while node is not None:
-#                 if node.value:
-#                     print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#                 node = node.nextNode
-#             print("None")
-#     print()
-#
-# print("REJECTED: ", length(rejected))
-# print()
-#
-# print(render_map(warehouse.floor, picker_current_cells(warehouse)))
-
-# Cantidad de zonas K configurable (independiente de la cantidad de pickers)
 K_ZONAS = 4
 
 zonas_espectrales = cs.main(
@@ -154,6 +74,7 @@ print()
 simulation = Simulation(
         warehouse,
         algorithm="bfs",
+        stop_orderer=selector,
         auto_assign=True
     )
 

@@ -23,6 +23,7 @@ Reglas de negocio implementadas:
 
 import math
 
+from warehouse.algorithms.stop_ordering import order_node_groups_directed, order_stops_directed
 from warehouse.domain.picker import Picker
 from warehouse.domain.product import Product
 from warehouse.domain.route import PickLine
@@ -102,14 +103,15 @@ class SpectralWaveSelector:
             return waves
 
         wave_counter = 0
+        round_counter = 0
         free_pool: list[Picker] = list(all_pickers)
         completed_shares: list[tuple[Picker, list[PickLine], list[int]]] = []
         # boundary_picker: (picker, shares, remaining_cap, [zone_idx])
         boundary_picker: tuple[Picker, list[PickLine], float, list[int]] | None = None
-        wave_summaries_log: list[tuple[Wave, list[tuple[Picker, list[PickLine], list[int]]]]] = []
+        wave_summaries_log: list[tuple[int, list[tuple[Wave, Picker, list[PickLine], list[int]]]]] = []
 
         def flush_current_wave() -> None:
-            nonlocal wave_counter, free_pool, completed_shares, boundary_picker
+            nonlocal wave_counter, round_counter, free_pool, completed_shares, boundary_picker
             if boundary_picker is not None:
                 b_p, b_s, _, b_z = boundary_picker
                 if b_s:
@@ -118,10 +120,20 @@ class SpectralWaveSelector:
             if not completed_shares:
                 free_pool = list(all_pickers)
                 return
-            wave_counter += 1
-            wave = self._create_wave(f"{self.id_prefix}{wave_counter}", completed_shares, demands_by_pid)
-            add(waves, wave)
-            wave_summaries_log.append((wave, list(completed_shares)))
+            round_counter += 1
+            round_entries: list[tuple[Wave, Picker, list[PickLine], list[int]]] = []
+            # Emitimos una Wave independiente por picker para que al terminar su recorrido
+            # pueda tomar la siguiente wave disponible sin esperar al resto de los pickers.
+            for picker, shares, zones_touched in completed_shares:
+                wave_counter += 1
+                wave = self._create_wave(
+                    f"{self.id_prefix}{wave_counter}",
+                    [(picker, shares, zones_touched)],
+                    demands_by_pid,
+                )
+                add(waves, wave)
+                round_entries.append((wave, picker, shares, zones_touched))
+            wave_summaries_log.append((round_counter, round_entries))
             free_pool = list(all_pickers)
             completed_shares = []
 
@@ -423,6 +435,11 @@ class SpectralWaveSelector:
             curr_xy = (float(nxt.product.x), float(nxt.product.y))
         return ordered
 
+    def order_stops(self, warehouse: WareHouse, start: int, stops: LinkedList, zone) -> LinkedList:
+        """Hook invocado por `start_assignment` para optimizar el orden de
+        paradas usando distancias dirigidas reales sobre el grafo del almacén."""
+        return order_stops_directed(warehouse, start, stops, zone)
+
     def _create_wave(
         self,
         wave_id: str,
@@ -433,34 +450,98 @@ class SpectralWaveSelector:
         planned_shares: list[tuple[Picker, list[PickLine]]] = []
 
         for picker, shares, _ in completed_shares:
-            planned_shares.append((picker, shares))
-            for pl in shares:
+            ordered_shares = self._order_shares_directed(shares)
+            planned_shares.append((picker, ordered_shares))
+            for pl in ordered_shares:
                 prio = demands_by_pid[pl.product.id].priority if pl.product.id in demands_by_pid else 1
                 wave.add_product_line(pl.product, pl.qty, priority=prio)
 
         wave.planned_shares = planned_shares
         return wave
 
+    def _order_shares_directed(self, shares: list[PickLine]) -> list[PickLine]:
+        """Ordena las líneas de picking usando distancias dirigidas reales del grafo
+        desde la zona de despacho OUTBOUND más cercana."""
+        if len(shares) <= 1:
+            return shares
+
+        sx = sum(pl.product.x for pl in shares) / len(shares)
+        sy = sum(pl.product.y for pl in shares) / len(shares)
+
+        best_access: list[int] = []
+        best_dist = math.inf
+        z_node = self.warehouse.zones.head
+        while z_node is not None:
+            zone = z_node.value
+            if zone is not None and zone.is_outbound:
+                cells: list[int] = []
+                acc = zone.access.head
+                while acc is not None:
+                    if acc.value is not None:
+                        cells.append(acc.value)
+                        zx, zy = self.warehouse.node_xy(acc.value)
+                        d = math.dist((sx, sy), (zx, zy))
+                        if d < best_dist:
+                            best_dist = d
+                    acc = acc.nextNode
+                if cells and best_access == []:
+                    best_access = cells
+                elif cells:
+                    zx0, zy0 = self.warehouse.node_xy(cells[0])
+                    bx0, by0 = self.warehouse.node_xy(best_access[0])
+                    if math.dist((sx, sy), (zx0, zy0)) < math.dist((sx, sy), (bx0, by0)):
+                        best_access = cells
+            z_node = z_node.nextNode
+
+        if not best_access:
+            return shares
+
+        stop_cell_lists: list[list[int]] = []
+        for pl in shares:
+            p_cells: list[int] = []
+            c_node = pl.product.pick_cells.head if pl.product.pick_cells else None
+            while c_node is not None:
+                if c_node.value is not None:
+                    p_cells.append(c_node.value)
+                c_node = c_node.nextNode
+            if not p_cells:
+                return shares
+            stop_cell_lists.append(p_cells)
+
+        perm = order_node_groups_directed(
+            self.warehouse,
+            best_access[0],
+            stop_cell_lists,
+            best_access,
+        )
+        return [shares[i] for i in perm]
+
     @staticmethod
     def _print_summary(
         ordered_zones: list[tuple[int, list[_ProductDemand]]],
-        wave_summaries_log: list[tuple[Wave, list[tuple[Picker, list[PickLine], list[int]]]]],
+        wave_summaries_log: list[tuple[int, list[tuple[Wave, Picker, list[PickLine], list[int]]]]],
     ) -> None:
+        total_waves = sum(len(entries) for _, entries in wave_summaries_log)
         print("=" * 70)
-        print(f" GENERACIÓN DE WAVES POR ZONAS ESPECTRALES ({len(wave_summaries_log)} waves creadas)")
+        print(
+            f" GENERACIÓN DE WAVES POR ZONAS ESPECTRALES "
+            f"({total_waves} waves independientes en {len(wave_summaries_log)} rondas)"
+        )
         print("=" * 70)
-        for wave, picker_entries in wave_summaries_log:
+        for round_num, picker_entries in wave_summaries_log:
+            round_weight = sum(w.total_weight for w, _, _, _ in picker_entries)
+            round_units = sum(w.total_units for w, _, _, _ in picker_entries)
             print(
-                f"  • Wave {wave.id} | Peso total: {wave.total_weight:.2f}kg | "
-                f"Unidades: {wave.total_units} | Pickers activos: {len(picker_entries)}"
+                f"  • Ronda {round_num} | Peso total: {round_weight:.2f}kg | "
+                f"Unidades: {round_units} | Pickers asignados: {len(picker_entries)}"
             )
-            for picker, shares, zones_touched in picker_entries:
+            for wave, picker, shares, zones_touched in picker_entries:
                 w_picker = sum(s.product.weight * s.qty for s in shares)
                 units_picker = sum(s.qty for s in shares)
                 zonas_str = " + ".join(f"Zona {z}" for z in zones_touched)
                 shared_tag = " [COMPARTIDO ENTRE 2 ZONAS]" if len(zones_touched) > 1 else ""
                 print(
-                    f"      - {picker.id} (cap {picker.capacity:.1f}kg): "
+                    f"      - Wave {wave.id} -> {picker.id} (cap {picker.capacity:.1f}kg): "
                     f"{w_picker:.2f}kg ({units_picker} u., {len(shares)} prods) -> {zonas_str}{shared_tag}"
                 )
         print("=" * 70)
