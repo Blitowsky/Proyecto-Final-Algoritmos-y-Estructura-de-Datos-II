@@ -63,11 +63,12 @@ class Wave:
         self.assignment_count: int = 0
 
     def why_not(self, order: Order) -> str|None:
+        """
         if order.state != "PENDIENTE":
             return f"El pedido {order.id} está {order.state}, solo se pueden añadir pedidos en PENDIENTE a una nueva wave."
         if self.order_count >= self.config.max_orders:
             return f"La wave {self.id} esta llena (max_orders {self.config.max_orders})."
-
+"""
         new_products = 0
         line = order.lines.head
         while line is not None:
@@ -167,15 +168,16 @@ class Wave:
                                     capacity -= line.value.product.weight
                                 else:
                                     break
-                            line.value.usado = contador
-                            wave_line = WaveLine(line.value.product, contador)
-                            add(self.lines, wave_line)
-                            insert(self.line_index, wave_line, pid)                           
-                            order.peso_restante -= contador * line.value.product.weight    
-                            self.product_count += 1
-                            self.total_units += contador
-                            self.total_weight += contador * line.value.product.weight 
-                            break 
+                            if contador != 0:
+                                line.value.usado += contador
+                                wave_line = WaveLine(line.value.product, contador)
+                                add(self.lines, wave_line)
+                                insert(self.line_index, wave_line, pid)                           
+                                order.peso_restante -= contador * line.value.product.weight    
+                                self.product_count += 1
+                                self.total_units += contador
+                                self.total_weight += contador * line.value.product.weight 
+                             
 
                     else:                        
                         contador=0
@@ -189,7 +191,7 @@ class Wave:
                             else:
                                 break
                         if contador != 0:
-                            line.value.usado = contador
+                            line.value.usado += contador
                             wave_line = WaveLine(line.value.product, contador)
                             add(self.lines, wave_line)
                             insert(self.line_index, wave_line, pid)                            
@@ -197,7 +199,7 @@ class Wave:
                             self.product_count += 1
                             self.total_units += contador
                             self.total_weight += contador * line.value.product.weight 
-                        break                                          
+                                                                  
             
                 line = line.nextNode 
             add(self.orders, order)

@@ -13,7 +13,7 @@ from warehouse.visualization.ascii_map import render_map, render_rows
 from warehouse.algorithms.generacioWave import generacionWaves, generacionWavesPruebas
 from warehouse.persistence.save_load import load, save
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande_mod.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_05_grande_mixto.json")
 
 config = load_config(SCENARIO)
 warehouse, noValido = build_warehouse(config)
@@ -128,7 +128,7 @@ print()
 
 
 
-waves= generacionWavesPruebas(warehouse.orders, warehouse.pickers, warehouse.wave_config)
+waves= generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
 
 wavesWareHouse = LinkedList()
 for wave in waves:

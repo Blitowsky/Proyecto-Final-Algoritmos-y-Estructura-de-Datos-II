@@ -221,7 +221,7 @@ class VentanaWaves(QMainWindow):
                 self._indices_waves[(i, j)] = contador
                 contador += 1
                 pedidos = list(iterar_linkedlist(wave.orders))
-                peso = sum(float(getattr(p, "total_weight", 0) or 0) for p in pedidos)
+                peso = wave.total_weight
                 nodo_wave = QTreeWidgetItem(
                     [f"Wave {wave.id} ({len(pedidos)} pedidos)", f"{peso:.2f}"]
                 )

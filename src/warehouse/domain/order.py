@@ -76,6 +76,8 @@ class Order:
             self.state = new
         elif self.state == "EN_PREPARACION":
             self.state = new
+        elif self.state == "EN_WAVE":
+            self.state = new
         elif self.state != expected:
             raise ValueError(f"El pedido {self.id} está {self.state}, debe ser {expected} antes de poder ser {new}.")
         self.state = new

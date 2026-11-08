@@ -9,7 +9,7 @@ def generacionWaves(ordenes, pickers, config):
     while currentNode is not None:
         picker.append(currentNode.value)
         currentNode = currentNode.nextNode
-    lista = listaDeWaveParaTodasLasOrdenes(pedidos, config, picker)
+    lista = generadorDeWaves(pedidos, config, picker)
     return lista
 
 def generadorDeWaves(pedidos, config, pickers):
@@ -19,27 +19,38 @@ def generadorDeWaves(pedidos, config, pickers):
         for i in range(len(pickers)):             
             capasidad = pickers[i].capacity
             muestra = pedidos[0]
+            if muestra[0].peso_restante < 0.1:
+                pedidos.pop(0)
+                continue
             if muestra[0].peso_restante > capasidad:                    
                 wave = Wave(str(indexPed), config)
                 indexPed += 1                
                 wave.add_partial_order(muestra[0], capasidad)   
                 waves_por_picker[i].append(wave)   
-                if muestra[0].state =="EN_WAVE":
+                if muestra[0].state =="EN_WAVE" and muestra[0].peso_restante < 0.01:
                     pedidos.pop(0)                             
             else:
-                muestra = pedidos.pop(0)               
-                pedCercanos = listaPedMinimo(pedidos, muestra[2])
-                wave = Wave(str(indexPed), config)
-                indexPed += 1
-                wave.add_order(muestra[0])
-                capasidad -= wave.total_weight                
+                if muestra[0].total_weight == muestra[0].peso_restante:
+                    muestra = pedidos.pop(0)               
+                    pedCercanos = listaPedMinimo(pedidos, muestra[2])
+                    wave = Wave(str(indexPed), config)
+                    indexPed += 1
+                    wave.add_order(muestra[0])
+                    capasidad -= wave.total_weight  
+                else:  
+                    pedidosFiltrados = [p for p in pedidos if p[0].id != muestra[0].id]
+                    pedCercanos = listaPedMinimo(pedidosFiltrados, muestra[2])
+                    wave = Wave(str(indexPed), config)
+                    indexPed += 1                  
+                    wave.add_partial_order(muestra[0], capasidad)
+                    capasidad -= wave.total_weight
                 for ped, val in pedCercanos:
                     if wave.order_count< config.max_orders:
                         if wave.fits(ped) and capasidad - ped.total_weight >= 0 :
                             wave.add_order(ped) 
                             capasidad -= ped.total_weight                       
                             pedidos = [t for t in pedidos if t[0] != ped]
-                        else:                            
+                        else:                                                      
                             wave.add_partial_order(ped, capasidad)                            
                             if ped =="EN_WAVE":
                                 pedidos = [t for t in pedidos if t[0] != ped]

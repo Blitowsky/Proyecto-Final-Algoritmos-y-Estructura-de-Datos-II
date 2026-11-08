@@ -32,7 +32,7 @@
         "ancho": 5,
         "alto": 2,
         "puerta_id": "PUERTA_OUT_1",
-        "peso_max_kg": 800.0
+        "peso_max_kg": 8000.0
       },
       {
         "id": "ZONA_B",
@@ -43,7 +43,7 @@
         "ancho": 5,
         "alto": 2,
         "puerta_id": "PUERTA_IN_1",
-        "peso_max_kg": 800.0
+        "peso_max_kg": 8000.0
       }
     ],
     "racks": [

@@ -24,8 +24,8 @@
     ]
   },
   "pickers": [
-    {"id": "PK_01", "posicion_inicial": {"x": 1, "y": 3}, "capacidad_carga_kg": 150.0},
-    {"id": "PK_02", "posicion_inicial": {"x": 16, "y": 3}, "capacidad_carga_kg": 100.0}
+    {"id": "PK_01", "posicion_inicial": {"x": 1, "y": 3}, "capacidad_carga_kg": 10.0},
+    {"id": "PK_02", "posicion_inicial": {"x": 16, "y": 3}, "capacidad_carga_kg": 10.0}
   ],
   "productos": [
     {"id": "P001", "nombre": "Monitor 27",       "rack_id": "R1", "ubicacion": {"x": 3,  "y": 5,  "z": 1}, "cantidad_disponible": 20, "peso_kg": 6.5},
@@ -41,6 +41,10 @@
     {"id": "PED_01", "prioridad": 5, "estado": "PENDIENTE", "items": [{"producto_id": "P001", "cantidad": 2}, {"producto_id": "P002", "cantidad": 1}]},
     {"id": "PED_02", "prioridad": 3, "estado": "PENDIENTE", "items": [{"producto_id": "P003", "cantidad": 2}, {"producto_id": "P005", "cantidad": 1}]},
     {"id": "PED_03", "prioridad": 4, "estado": "PENDIENTE", "items": [{"producto_id": "P004", "cantidad": 1}, {"producto_id": "P006", "cantidad": 1}, {"producto_id": "P008", "cantidad": 3}]}
+
+
+   
+
   ],
   "configuracion": {"wave_max_pedidos": 3, "wave_max_productos": 15}
 }
