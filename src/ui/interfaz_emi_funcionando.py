@@ -1,11 +1,16 @@
 import sys
 import math
 import os
+import inspect
 import clustering.spectral as cs
 
 from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
 from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit, QDialog, QVBoxLayout, QComboBox, QSpinBox, QDialogButtonBox
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QLabel, QTextEdit, QDialog,
+    QVBoxLayout, QHBoxLayout, QComboBox, QSpinBox, QDialogButtonBox,
+    QFileDialog, QLineEdit, QMessageBox
+)
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
@@ -13,6 +18,9 @@ from warehouse.services.wave_builder import WaveBuilder
 from warehouse.simulation.simulation import Simulation
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
+from warehouse.persistence.save_load import (
+    load_warehouse, load_simulation, save_simulation
+)
 from warehouse.domain.direction import N, S, E, O, AMBOS
 
 
@@ -28,164 +36,119 @@ from warehouse.algorithms.generacioWave import generacionWaves
 # ==================================================
 
 class DialogoEstrategia(QDialog):
+    """Pantalla inicial: elegir fuente y estrategia (si no se reanuda)."""
 
-    def __init__(self, max_zonas):
-
+    def __init__(self, max_zonas=1000):
         super().__init__()
-
-        self.setWindowTitle(
-            "Configuracion de estrategia"
-        )
-
-        self.setMinimumWidth(350)
-
-        #Layout vertical del dialogo
+        self.setWindowTitle("Inicio de la simulacion")
+        self.setMinimumWidth(540)
         layout = QVBoxLayout(self)
 
+        layout.addWidget(QLabel("¿Como queres iniciar?"))
+        self.combo_origen = QComboBox()
+        self.combo_origen.addItem("Crear warehouse nuevo desde un JSON", "nuevo")
+        self.combo_origen.addItem("Reanudar una simulacion guardada (.pkl)", "simulacion")
+        layout.addWidget(self.combo_origen)
 
-        # ==================================================
-        # ESTRATEGIA
-        # ==================================================
+        layout.addWidget(QLabel("Archivo de origen:"))
+        fila_archivo = QHBoxLayout()
+        self.ruta_archivo = QLineEdit()
+        self.ruta_archivo.setPlaceholderText("Selecciona el archivo JSON o PKL")
+        fila_archivo.addWidget(self.ruta_archivo)
+        self.boton_examinar = QPushButton("Examinar...")
+        self.boton_examinar.clicked.connect(self.elegir_archivo)
+        fila_archivo.addWidget(self.boton_examinar)
+        layout.addLayout(fila_archivo)
 
-        layout.addWidget(
-            QLabel("Estrategia de generacion de Waves:")
-        )
-
+        layout.addWidget(QLabel("Estrategia de generacion de Waves:"))
         self.combo_estrategia = QComboBox()
+        self.combo_estrategia.addItem("Centroide", "centroide")
+        self.combo_estrategia.addItem("Clustering espectral", "clustering")
+        layout.addWidget(self.combo_estrategia)
 
-        #El segundo valor queda guardado internamente
-        self.combo_estrategia.addItem(
-            "Centroide",
-            "centroide"
-        )
-
-        self.combo_estrategia.addItem(
-            "Clustering espectral",
-            "clustering"
-        )
-
-        layout.addWidget(
-            self.combo_estrategia
-        )
-
-
-        # ==================================================
-        # CANTIDAD DE ZONAS K
-        # ==================================================
-
-        layout.addWidget(
-            QLabel("Cantidad de zonas (K):")
-        )
-
+        layout.addWidget(QLabel("Cantidad de zonas (K):"))
         self.spin_k = QSpinBox()
+        self.spin_k.setRange(1, max(1, max_zonas))
+        self.spin_k.setValue(min(4, max(1, max_zonas)))
+        layout.addWidget(self.spin_k)
 
-        self.spin_k.setMinimum(1)
-
-        self.spin_k.setMaximum(
-            max(1, max_zonas)
-        )
-
-        self.spin_k.setValue(
-            min(4, max(1, max_zonas))
-        )
-
-        layout.addWidget(
-            self.spin_k
-        )
-
-
-        # ==================================================
-        # METRICA
-        # ==================================================
-
-        layout.addWidget(
-            QLabel("Metrica del clustering:")
-        )
-
+        layout.addWidget(QLabel("Metrica del clustering:"))
         self.combo_metrica = QComboBox()
+        self.combo_metrica.addItem("Topologica", "t")
+        self.combo_metrica.addItem("Euclidiana", "e")
+        layout.addWidget(self.combo_metrica)
 
-        self.combo_metrica.addItem(
-            "Topologica",
-            "t"
-        )
-
-        self.combo_metrica.addItem(
-            "Euclidiana",
-            "e"
-        )
-
-        layout.addWidget(
-            self.combo_metrica
-        )
-
-
-        # ==================================================
-        # BOTONES
-        # ==================================================
+        self.label_ayuda = QLabel("")
+        self.label_ayuda.setWordWrap(True)
+        layout.addWidget(self.label_ayuda)
 
         self.botones = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            |
+            QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
         )
+        self.botones.accepted.connect(self.accept)
+        self.botones.rejected.connect(self.reject)
+        layout.addWidget(self.botones)
 
-        #Si toca OK cierro aceptando
-        self.botones.accepted.connect(
-            self.accept
-        )
+        self.combo_origen.currentIndexChanged.connect(self.actualizar_origen)
+        self.combo_estrategia.currentIndexChanged.connect(self.actualizar_opciones)
+        self.actualizar_origen()
 
-        #Si toca Cancelar cierro rechazando
-        self.botones.rejected.connect(
-            self.reject
-        )
-
-        layout.addWidget(
-            self.botones
-        )
-
-
-        # ==================================================
-        # CAMBIO DE ESTRATEGIA
-        # ==================================================
-
-        self.combo_estrategia.currentIndexChanged.connect(
-            self.actualizar_opciones
-        )
-
+    def actualizar_origen(self):
+        origen = self.origen()
+        self.ruta_archivo.setText({
+            "nuevo": "src/data/escenario_grande.json",
+            "warehouse": "warehouse.pkl",
+            "simulacion": "simulation.pkl",
+        }[origen])
+        self.label_ayuda.setText({
+            "nuevo": "Se crea el warehouse desde el escenario y se generan las waves.",
+            "warehouse": "Se recupera el warehouse. Si ya tiene waves, se conservan.",
+            "simulacion": "Se recuperan el tick, los pickers y las waves sin reiniciar la simulacion.",
+        }[origen])
         self.actualizar_opciones()
 
-
     def actualizar_opciones(self):
+        # Reanudar una simulacion no debe volver a generar las waves.
+        permite_elegir = self.origen() != "simulacion"
+        self.combo_estrategia.setEnabled(permite_elegir)
+        usa_clustering = permite_elegir and self.estrategia() == "clustering"
+        self.spin_k.setEnabled(usa_clustering)
+        self.combo_metrica.setEnabled(usa_clustering)
 
-        #Obtengo el valor interno del combo
-        estrategia = self.combo_estrategia.currentData()
-
-        #K y metrica solo tienen sentido para clustering
-        usa_clustering = (
-            estrategia == "clustering"
+    def elegir_archivo(self):
+        origen = self.origen()
+        filtro = ("Archivos JSON (*.json)" if origen == "nuevo"
+                  else "Archivos guardados (*.pkl)")
+        archivo, _ = QFileDialog.getOpenFileName(
+            self, "Seleccionar archivo", self.ruta_archivo.text() or os.getcwd(), filtro
         )
+        if archivo:
+            self.ruta_archivo.setText(archivo)
 
-        self.spin_k.setEnabled(
-            usa_clustering
-        )
+    def accept(self):
+        ruta = self.archivo()
+        if not ruta or not os.path.isfile(ruta):
+            QMessageBox.warning(
+                self, "Archivo no encontrado",
+                "Selecciona un archivo existente para iniciar la simulacion."
+            )
+            return
+        super().accept()
 
-        self.combo_metrica.setEnabled(
-            usa_clustering
-        )
+    def archivo(self):
+        return os.path.abspath(os.path.expanduser(self.ruta_archivo.text().strip())) if self.ruta_archivo.text().strip() else ""
 
+    def origen(self):
+        return self.combo_origen.currentData()
 
     def estrategia(self):
-
         return self.combo_estrategia.currentData()
 
-
     def k_zonas(self):
-
         return self.spin_k.value()
 
-
     def metrica(self):
-
         return self.combo_metrica.currentData()
 
 
@@ -196,7 +159,9 @@ class DialogoEstrategia(QDialog):
 
 class Ventana(QWidget):
 
-    def __init__(self, warehouse, simulation, zonas_espectrales=None, estrategia="centroide", k_zonas=None, metrica=None):
+    def __init__(self, warehouse, simulation, zonas_espectrales=None, estrategia="centroide",
+                 k_zonas=None, metrica=None, zona_producto_guardada=None,
+                 cantidad_zonas_guardadas=None, reanudada=False):
         super().__init__()
 
         #Guardo el warehouse que recibo
@@ -215,9 +180,11 @@ class Ventana(QWidget):
 
         #Diccionario para saber rapidamente
         #a que zona pertenece cada producto
-        self.zona_producto = {}
-        
+        self.zona_producto = dict(zona_producto_guardada or {})
+        self.cantidad_zonas = cantidad_zonas_guardadas or 0
+
         if self.zonas_espectrales is not None:
+            self.cantidad_zonas = len(self.zonas_espectrales)
 
             numero_zona = 1
 
@@ -287,6 +254,11 @@ class Ventana(QWidget):
         self.boton_paso.setGeometry(210, 10, 80, 30)
         self.boton_paso.clicked.connect(self.paso)
         
+        #Guardar el estado completo de Simulation (y su warehouse)
+        self.boton_guardar = QPushButton("Guardar", self)
+        self.boton_guardar.setGeometry(300, 10, 100, 30)
+        self.boton_guardar.clicked.connect(self.guardar_simulacion)
+
         #Boton para mostrar la velocidad actual
         self.label_velocidad = QLabel("Intervalo: 300 ms", self)
 
@@ -304,8 +276,8 @@ class Ventana(QWidget):
         # TICK ACTUAL
         # ==================================================
 
-        self.label_tick = QLabel("Tick: 0", self)
-        self.label_tick.setGeometry(310, 10, 100, 30)
+        self.label_tick = QLabel(f"Tick: {self.simulation.tick}", self)
+        self.label_tick.setGeometry(410, 8, 120, 25)
         
         # ==================================================
         # PANEL DE EVENTOS
@@ -323,6 +295,14 @@ class Ventana(QWidget):
 
         #Texto inicial
         self.panel_eventos.setPlainText("Eventos de la simulacion:\n")
+        if reanudada:
+            self.panel_eventos.append(
+                f"=== SIMULACION REANUDADA EN TICK {self.simulation.tick} ==="
+            )
+            # Evitar bloquear la UI si se guardo una simulacion muy larga.
+            eventos_recientes = [e for e in self.simulation.events if e.kind != "move"][-300:]
+            for evento in eventos_recientes:
+                self.panel_eventos.append(self.formatear_evento(evento))
         
         # ==================================================
         # INFORMACION DE ESTRATEGIA
@@ -332,7 +312,7 @@ class Ventana(QWidget):
 
             texto_estrategia = "Estrategia: Centroide"
 
-        else:
+        elif self.estrategia == "clustering":
 
             nombre_metrica = (
                 "Topologica"
@@ -344,6 +324,9 @@ class Ventana(QWidget):
                 f"Estrategia: Clustering espectral | "
                 f"K={self.k_zonas} | {nombre_metrica}"
             )
+
+        else:
+            texto_estrategia = "Estrategia: no registrada en el archivo guardado"
 
         self.label_estrategia = QLabel(
             texto_estrategia,
@@ -370,13 +353,15 @@ class Ventana(QWidget):
                 self.estado_pickers[picker.id] = "Libre"
 
             actual_picker = actual_picker.nextNode
-    
+
+        self.actualizar_estado_pickers([])
+
     def color_zona(self, zona):
 
         if zona is None:
             return QColor("black")
 
-        cantidad_zonas = len(self.zonas_espectrales)
+        cantidad_zonas = self.cantidad_zonas
 
         if cantidad_zonas == 0:
             return QColor("black")
@@ -518,6 +503,43 @@ class Ventana(QWidget):
             int(x4),
             int(y4)
         )
+
+    def guardar_simulacion(self):
+        """Guardar el estado en un .pkl, sin serializar widgets de PyQt."""
+        estaba_corriendo = self.timer.isActive()
+        self.timer.stop()
+        try:
+            ruta, _ = QFileDialog.getSaveFileName(
+                self, "Guardar simulacion", "simulation.pkl",
+                "Simulaciones (*.pkl)"
+            )
+            if not ruta:
+                return
+            if not ruta.lower().endswith(".pkl"):
+                ruta += ".pkl"
+
+            metadatos = {
+                "estrategia": self.estrategia,
+                "k_zonas": self.k_zonas,
+                "metrica": self.metrica,
+                "zona_producto": dict(self.zona_producto),
+                "cantidad_zonas": self.cantidad_zonas,
+            }
+            # save_load.py serializa Simulation, que ya contiene warehouse.
+            save_simulation(self.simulation, ruta, metadata=metadatos)
+            self.panel_eventos.append(
+                f"Simulacion guardada en tick {self.simulation.tick}: {ruta}"
+            )
+            QMessageBox.information(
+                self, "Guardado exitoso", f"Simulacion guardada en:\n{ruta}"
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self, "Error al guardar", f"No se pudo guardar la simulacion:\n{error}"
+            )
+        finally:
+            if estaba_corriendo and not self.simulation.finished:
+                self.timer.start()
 
     def play(self):
 
@@ -1159,133 +1181,141 @@ class Ventana(QWidget):
             actual_picker = actual_picker.nextNode
 
 
-app = QApplication(sys.argv)
+def registrar_waves_generadas(warehouse, resultado):
+    """Admite generacionWaves de 1 o 3 parametros y listas por picker."""
+    if resultado is None:
+        return
 
-#Cargo el escenario
-config = load_config("src/data/escenario_grande.json")
+    def recorrer(valor):
+        if valor is None:
+            return
+        if hasattr(valor, "orders") and hasattr(valor, "status"):
+            yield valor
+        elif hasattr(valor, "head"):
+            actual = valor.head
+            while actual is not None:
+                yield from recorrer(actual.value)
+                actual = actual.nextNode
+        elif isinstance(valor, (list, tuple)):
+            for item in valor:
+                yield from recorrer(item)
 
-#Construyo el warehouse
-warehouse = build_warehouse(config)
-
-
-# ==================================================
-# CONFIGURACION DE ESTRATEGIA
-# ==================================================
-
-#Obtengo los productos considerados por el clustering
-productos_clustering = cs.extract_pending_products(
-    warehouse
-)
-
-#Creo el dialogo y establezco el maximo de zonas
-dialogo = DialogoEstrategia(
-    max_zonas=max(1, len(productos_clustering))
-)
-
-#Muestro el dialogo y espero la eleccion del usuario
-resultado = dialogo.exec()
-
-#Si el usuario cancela, termina el programa
-if resultado != QDialog.DialogCode.Accepted:
-    sys.exit(0)
+    from warehouse.structures.linkedlist import add
+    existentes = {id(w) for w in warehouse.waves if w is not None}
+    for wave in recorrer(resultado):
+        if id(wave) not in existentes:
+            add(warehouse.waves, wave)
+            existentes.add(id(wave))
 
 
-#Obtengo la estrategia elegida
-estrategia = dialogo.estrategia()
-
-#Por defecto no tenemos zonas espectrales
-zonas_espectrales = None
-K_ZONAS = None
-METRICA = None
-
-
-# ==================================================
-# ESTRATEGIA CENTROIDE
-# ==================================================
-
-if estrategia == "centroide":
-
-    print("Estrategia seleccionada: Centroide")
-    """
-    selector = ProductCentroidSelector(
-        warehouse,
-        warehouse.orders
-    )
-    """
-    generacionWaves(warehouse)
-    
-
-# ==================================================
-# ESTRATEGIA CLUSTERING ESPECTRAL
-# ==================================================
-
-elif estrategia == "clustering":
-
-    #Obtengo las opciones elegidas por el usuario
-    K_ZONAS = dialogo.k_zonas()
-    METRICA = dialogo.metrica()
-
-    print("Estrategia seleccionada: Clustering espectral")
-    print("K:", K_ZONAS)
-    print("Metrica:", METRICA)
-
-    if not productos_clustering:
-        raise ValueError(
-            "No hay productos en pedidos pendientes para clusterizar."
+def generar_waves_centroide(warehouse):
+    """Compatible con ambas firmas presentes en distintas ramas del proyecto."""
+    cantidad_parametros = len(inspect.signature(generacionWaves).parameters)
+    if cantidad_parametros == 1:
+        resultado = generacionWaves(warehouse)
+    else:
+        resultado = generacionWaves(
+            warehouse.orders, warehouse.pickers, warehouse.wave_config
         )
+    registrar_waves_generadas(warehouse, resultado)
 
-    #Calculo las zonas
-    zonas_espectrales = cs.main(
-        warehouse=warehouse,
-        k_zones=K_ZONAS,
-        metric=METRICA
-    )
 
-    #Creo el selector espectral
-    selector = SpectralWaveSelector(
-        warehouse=warehouse,
-        spectral_zones=zonas_espectrales,
-        pickers=warehouse.pickers
-    )
+def iniciar():
+    app = QApplication(sys.argv)
+    dialogo = DialogoEstrategia()
 
-    # ==================================================
-    # GENERACION DE WAVES
-    # ==================================================
+    while True:
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return 0
 
-    waves, rejected = WaveBuilder(
+        try:
+            origen = dialogo.origen()
+            estrategia = dialogo.estrategia()
+            zonas_espectrales = None
+            K_ZONAS = None
+            METRICA = None
+            zona_producto_guardada = None
+            cantidad_zonas_guardadas = None
+            reanudada = False
+
+            if origen == "simulacion":
+                # MUY IMPORTANTE: no crear warehouse, waves ni Simulation nuevamente.
+                simulation, metadata = load_simulation(dialogo.archivo())
+                warehouse = simulation.warehouse
+                estrategia = metadata.get("estrategia", "desconocida")
+                K_ZONAS = metadata.get("k_zonas")
+                METRICA = metadata.get("metrica")
+                zona_producto_guardada = metadata.get("zona_producto")
+                cantidad_zonas_guardadas = metadata.get("cantidad_zonas")
+                reanudada = True
+            else:
+                if origen == "warehouse":
+                    warehouse = load_warehouse(dialogo.archivo())
+                    # Un warehouse aislado no tiene walkers ni el contador tick.
+                    for picker in warehouse.pickers:
+                        assignment = getattr(picker, "assignment", None) if picker is not None else None
+                        if assignment is not None and assignment.status == "running":
+                            raise ValueError(
+                                "Este warehouse tiene asignaciones en curso. "
+                                "Para continuar el avance debes cargar una simulacion (.pkl)."
+                            )
+                else:
+                    config = load_config(dialogo.archivo())
+                    warehouse = build_warehouse(config)
+
+                # Si el warehouse ya tenia waves, se mantienen tal cual.
+                if warehouse.waves.head is None:
+                    if estrategia == "centroide":
+                        generar_waves_centroide(warehouse)
+                    else:
+                        productos = cs.extract_pending_products(warehouse)
+                        if not productos:
+                            raise ValueError(
+                                "No hay productos pendientes para clustering espectral."
+                            )
+                        K_ZONAS = min(dialogo.k_zonas(), len(productos))
+                        METRICA = dialogo.metrica()
+                        zonas_espectrales = cs.main(
+                            warehouse=warehouse, k_zones=K_ZONAS, metric=METRICA
+                        )
+                        selector = SpectralWaveSelector(
+                            warehouse=warehouse,
+                            spectral_zones=zonas_espectrales,
+                            pickers=warehouse.pickers
+                        )
+                        WaveBuilder(
+                            warehouse, selector=selector, pickers=warehouse.pickers
+                        ).build()
+                elif estrategia == "clustering":
+                    # No regenerar waves existentes ni recalcular sus agrupaciones.
+                    K_ZONAS = dialogo.k_zonas()
+                    METRICA = dialogo.metrica()
+
+                simulation = Simulation(
+                    warehouse, algorithm="bfs", auto_assign=True
+                )
+            break
+        except Exception as error:
+            QMessageBox.critical(
+                dialogo, "No se pudo iniciar",
+                f"Error al cargar o crear la simulacion:\n{error}"
+            )
+            # Dejar al usuario corregir la ruta sin cerrar la aplicacion.
+
+    ventana = Ventana(
         warehouse,
-        selector=selector,
-        pickers=warehouse.pickers
-    ).build()
+        simulation,
+        zonas_espectrales,
+        estrategia=estrategia,
+        k_zonas=K_ZONAS,
+        metrica=METRICA,
+        zona_producto_guardada=zona_producto_guardada,
+        cantidad_zonas_guardadas=cantidad_zonas_guardadas,
+        reanudada=reanudada,
+    )
+    ventana.showMaximized()
+    return app.exec()
 
 
-
-
-
-# ==================================================
-# SIMULACION
-# ==================================================
-
-simulation = Simulation(
-    warehouse,
-    algorithm="bfs",
-    auto_assign=True
-)
-
-
-# ==================================================
-# INTERFAZ GRAFICA
-# ==================================================
-
-ventana = Ventana(
-    warehouse,
-    simulation,
-    zonas_espectrales,
-    estrategia=estrategia,
-    k_zonas=K_ZONAS,
-    metrica=METRICA
-)
-
-ventana.showMaximized()
-
-app.exec()
+if __name__ == "__main__":
+    sys.exit(iniciar())
