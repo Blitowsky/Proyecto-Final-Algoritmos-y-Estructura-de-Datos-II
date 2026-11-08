@@ -6,7 +6,7 @@ llaman estas funciones, nadie lo reimplementa.
 
 from warehouse.structures.graph import WeightedDirectedGraph
 from warehouse.structures.linkedlist import LinkedList, add
-from warehouse.structures.dictionary import Dictionary, search, insert, delete
+from warehouse.structures.dictionary import CloseDictionary, search, insert, delete
 from warehouse.structures.queue import Queue
 from warehouse.structures.min_queue import MinQueue
 
@@ -163,7 +163,7 @@ def _target_ids(targets: LinkedList|int) -> list[int]:
         raise ValueError("Una búsqueda necesita al menos un objetivo.")
     return ids
 
-def _target_set(ids: list[int], size: int) -> Dictionary:
+def _target_set(ids: list[int], size: int) -> CloseDictionary:
     """Guarda los objetivos como vistos en una hash table.
 
     Parámetros
@@ -177,12 +177,12 @@ def _target_set(ids: list[int], size: int) -> Dictionary:
     ----------
         Un diccionario, con valores `True` con los objetivos como keys.
     """
-    found = Dictionary(size)
+    found = CloseDictionary(size)
     for target in ids:
         insert(found, True, target)
     return found
 
-def _build_path(parent: Dictionary, source: int, last: int) -> LinkedList:
+def _build_path(parent: CloseDictionary, source: int, last: int) -> LinkedList:
     """Convierte un diccionario de padres en una lista con el recorrido
 
     Parámetros
@@ -225,7 +225,7 @@ def _single_node_result(source: int) -> SearchResult:
     add(path, source)
     return SearchResult(path, 0, 0, 0)
 
-def _is_blocked(blocked: Dictionary|None, node: int) -> bool:
+def _is_blocked(blocked: CloseDictionary|None, node: int) -> bool:
     """Revisa si el nodo `node` está bloqueado por alguien.
 
     Parámetros
@@ -247,7 +247,7 @@ def bfs_path(
     graph: WeightedDirectedGraph, 
     source: int, 
     targets: LinkedList,
-    blocked: Dictionary|None = None,
+    blocked: CloseDictionary|None = None,
     trace: LinkedList|None = None
 ) -> SearchResult|None:
     size = _table_size(graph)
@@ -255,8 +255,8 @@ def bfs_path(
     if search(goal, source) is not None:
         return _single_node_result(source)
 
-    parent = Dictionary(size)
-    cost = Dictionary(size)
+    parent = CloseDictionary(size)
+    cost = CloseDictionary(size)
     insert(cost, 0, source)
     insert(parent, source)
 
@@ -296,9 +296,9 @@ def bfs_path(
             step = step.nextNode
     return None
 
-def bfs_distances(graph: WeightedDirectedGraph, source: int, blocked: Dictionary|None = None) -> Dictionary:
+def bfs_distances(graph: WeightedDirectedGraph, source: int, blocked: CloseDictionary|None = None) -> CloseDictionary:
     size = _table_size(graph)
-    steps = Dictionary(size)
+    steps = CloseDictionary(size)
     insert(steps, 0, source)
     queue = Queue()
     queue.enqueue(source)
@@ -325,7 +325,7 @@ def _best_first(
     source: int,
     ids: list[int],
     heuristic,
-    blocked: Dictionary|None,
+    blocked: CloseDictionary|None,
     trace: LinkedList|None
 ) -> SearchResult|None:
     size = _table_size(graph)
@@ -333,9 +333,9 @@ def _best_first(
     if search(goal, source) is not None:
         return _single_node_result(source)
 
-    cost = Dictionary(size)
-    parent = Dictionary(size)
-    closed = Dictionary(size)
+    cost = CloseDictionary(size)
+    parent = CloseDictionary(size)
+    closed = CloseDictionary(size)
     insert(cost, 0, source)
 
     queue = MinQueue()
@@ -383,20 +383,76 @@ def _best_first(
                 queue.push(new_cost + (0 if heuristic is None else heuristic(nxt)), nxt)
             step = step.nextNode
     return None
-                
+
+def bfs_distances_targeted(graph, source, targets, blocked=None):
+    size = _table_size(graph)
+    ids = _target_ids(targets)
+    goal = _target_set(ids, size)
+    total_targets = len(set(ids))   # únicos, no repetidos
+    steps = CloseDictionary(size)
+    insert(steps, 0, source)
+
+    queue = Queue()
+    queue.enqueue(source)
+
+    # Llevamos la cuenta de cuántos objetivos hemos encontrado para poder cortar antes
+    found_count = 0
+
+    # Diccionario exclusivo para retornar solo los resultados de los objetivos
+    target_distances = CloseDictionary(size)
+
+    # Si el origen es un objetivo, lo registramos inmediatamente
+    if search(goal, source) is not None:
+        insert(target_distances, 0, source)
+        found_count += 1
+
+    while not queue.is_empty() and found_count < total_targets:
+        current = queue.dequeue()
+        neighbor_list = neighbors(graph, current)
+        step = neighbor_list.head
+
+        while step is not None:
+            if step.value is None or not isinstance(step.value, tuple):
+                step = step.nextNode
+                continue
+
+            nxt = step.value[0]
+            current_steps = search(steps, current)
+
+            if search(steps, nxt) is not None or _is_blocked(blocked, nxt) or current_steps is None:
+                step = step.nextNode
+                continue
+
+            new_distance = current_steps + 1
+            insert(steps, new_distance, nxt)
+
+            # Si el vecino es uno de los objetivos, guardamos su distancia en el diccionario de retorno
+            if search(goal, nxt) is not None:
+                insert(target_distances, new_distance, nxt)
+                found_count += 1
+
+                # Si ya encontramos todos, podemos romper el bucle interno
+                if found_count >= total_targets:
+                    break
+
+            queue.enqueue(nxt)
+            step = step.nextNode
+
+    return target_distances          
+
 def dijkstra_path(
     graph: WeightedDirectedGraph,
     source: int,
     targets: LinkedList,
-    blocked: Dictionary|None = None,
+    blocked: CloseDictionary|None = None,
     trace: LinkedList|None = None
 ) -> SearchResult|None:
     return _best_first(graph, source, _target_ids(targets), None, blocked, trace)
 
-def dijkstra_distances(graph: WeightedDirectedGraph, source: int, blocked: Dictionary|None = None) -> Dictionary:
+def dijkstra_distances(graph: WeightedDirectedGraph, source: int, blocked: CloseDictionary|None = None) -> CloseDictionary:
     size = _table_size(graph)
-    cost = Dictionary(size)
-    closed = Dictionary(size)
+    cost = CloseDictionary(size)
+    closed = CloseDictionary(size)
     insert(cost, 0, source)
     queue = MinQueue()
     queue.push(0, source)
@@ -431,7 +487,7 @@ def astar_path(
     source: int,
     targets: LinkedList,
     step_cost: int = 1,
-    blocked: Dictionary|None = None,
+    blocked: CloseDictionary|None = None,
     trace: LinkedList|None = None
 ):
     ids = _target_ids(targets)
@@ -456,7 +512,7 @@ def find_path(
     source: int,
     targets: LinkedList,
     algorithm: str = "bfs",
-    blocked: Dictionary|None = None,
+    blocked: CloseDictionary|None = None,
     trace: LinkedList|None = None
 ) -> SearchResult|None:
     """

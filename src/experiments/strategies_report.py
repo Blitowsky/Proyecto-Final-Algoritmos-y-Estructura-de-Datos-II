@@ -22,7 +22,7 @@ def t1(results):
     labels = config.STRATEGIES
     cols = ["scenario", "metric"] + [labels[k] for k in keys] + \
            [f"{labels[k]} vs {labels[keys[0]][:1]} (%)" for k in keys[1:]]
-    flat, md = [], "## T1 - Route strategy comparison (same scenario, same waves)\n\n"
+    flat, md = [], "## T1 - Comparación de estrategias (mismo escenario, distintas waves)\n\n"
     for scn, per in results.items():
         metrics = _metric_order(list(per.values()))
         sc_rows = []

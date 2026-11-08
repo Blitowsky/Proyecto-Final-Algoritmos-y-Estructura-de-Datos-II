@@ -6,6 +6,7 @@ from warehouse.domain.cell import DOOR, HALL, RACK, ZONE
 
 from warehouse.algorithms.pathfinding import SearchResult, find_path
 from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
+from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
 
 from warehouse.services.warehouse_loader import build_warehouse
 from warehouse.services.wave_builder import WaveBuilder
@@ -13,6 +14,8 @@ from warehouse.services.wave_builder import WaveBuilder
 from warehouse.persistence.scenario_loader import load_config
 
 from warehouse.simulation.simulation import Simulation
+
+import clustering.spectral as cs
 
 def load_floor(json_path):
     config = load_config(json_path)
@@ -48,6 +51,19 @@ def run_simulation(warehouse: WareHouse, strategy_key):
     match strategy_key:
         case "centroids":
             selector = ProductCentroidSelector(warehouse, warehouse.orders)
+        case "spectral":
+            K_ZONES = 3
+            spectral_zones = cs.main(
+                warehouse=warehouse,
+                k_zones=K_ZONES,
+                metric="e"
+            )
+
+            selector = SpectralWaveSelector(
+                warehouse=warehouse,
+                spectral_zones=spectral_zones,
+                pickers=warehouse.pickers
+            )
         case _:
             selector = None
     waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()

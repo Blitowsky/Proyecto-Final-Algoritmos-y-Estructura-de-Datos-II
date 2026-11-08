@@ -16,18 +16,18 @@ def _by_algo(rows):
 
 
 def t3(rows):
-    cols = ["scenario", "V", "E", "algorithm", "queries", "reachable", "time_ms",
-            "expanded", "examined", "expanded_vs_BFS_%", "avg_route_cost", "cost_mismatches"]
+    cols = ["escenario", "V", "E", "algoritmo", "queries", "alcanzables", "time_ms",
+            "expandidos", "examinados", "expandidos_vs_BFS_%", "costo_medio_ruta", "diferencias_costo"]
     base = {r["scenario"]: r["expanded"] for r in rows if r["algo"] == "bfs"}
     table = []
     for r in sorted(rows, key=lambda r: (r["V"], config.SEARCH_ALGOS.index(r["algo"]))):
         b = base.get(r["scenario"])
-        table.append({"scenario": r["scenario"], "V": r["V"], "E": r["E"],
-                      "algorithm": L[r["algo"]], "queries": r["queries"],
-                      "reachable": r["reachable"], "time_ms": r["time_ms"],
-                      "expanded": r["expanded"], "examined": r["examined"],
-                      "expanded_vs_BFS_%": (100 * r["expanded"] / b) if b else None,
-                      "avg_route_cost": r["cost"], "cost_mismatches": r["cost_mismatches"]})
+        table.append({"escenario": r["scenario"], "V": r["V"], "E": r["E"],
+                      "algoritmo": L[r["algo"]], "queries": r["queries"],
+                      "alcanzables": r["reachable"], "time_ms": r["time_ms"],
+                      "expandidos": r["expanded"], "examinados": r["examined"],
+                      "expandidos_vs_BFS_%": (100 * r["expanded"] / b) if b else None,
+                      "costo_medio_ruta": r["cost"], "diferencias_costo": r["cost_mismatches"]})
     note = ("Per-query significa pares de pasillos alcanzables (src, dst); time es la media de "
             f"{config.SEARCH_REPEATS} repeticiones. `expanded` = nodos procesados, `examined` = aristas "
             "observadas. `cost_mismatches` debe ser 0 (los 3 encontraron el mejor recorrido posible).")
@@ -44,36 +44,6 @@ def _fit(xs, ys):
     ss_res = float(((Y - (a + b * X)) ** 2).sum())
     ss_tot = float(((Y - Y.mean()) ** 2).sum()) or 1.0
     return b, 1 - ss_res / ss_tot
-
-
-THEORY = {
-    "bfs":      ("O(V + E)",         "O(V)", "O(1): dst adyacente a src", "O(V + E)"),
-    "dijkstra": ("O((V + E) log V)", "O(V)", "O(1): dst adyacente a src", "O((V + E) log V)"),
-    "astar":    ("O((V + E) log V)", "O(V)", "O(1): dst adyacente a src",
-                 "O((V + E) log V); en realidad muchos menos nodos con la heurística Manhattan"),
-}
-
-
-def t4(rows):
-    by = _by_algo(rows)
-    cols = ["algorithm", "time (theory)", "space", "best case", "worst case",
-            "measured time ~ V^b", "R2 (time)", "measured expanded ~ V^b", "R2 (expanded)"]
-    table = []
-    for a in config.SEARCH_ALGOS:
-        rs = by[a]
-        ft = _fit([r["V"] for r in rs], [r["time_ms"] for r in rs])
-        fe = _fit([r["V"] for r in rs], [r["expanded"] for r in rs])
-        t, sp, best, worst = THEORY[a]
-        table.append({"algorithm": L[a], "time (theory)": t, "space": sp, "best case": best,
-                      "worst case": worst,
-                      "measured time ~ V^b": f"b = {ft[0]:.2f}" if ft else "n/a (<3 sizes)",
-                      "R2 (time)": f"{ft[1]:.3f}" if ft else "-",
-                      "measured expanded ~ V^b": f"b = {fe[0]:.2f}" if fe else "n/a (<3 sizes)",
-                      "R2 (expanded)": f"{fe[1]:.3f}" if fe else "-"})
-    note = ("b es la pendiente de la escala log-log entre escenarios con V de distintos tamaños. "
-            "En este grafo grilla, E es alrededor de 4V, entonces O(V + E) se comporta como O(V): b ~ 1 para BFS; "
-            "Dijkstra/A* se espera un poco arriba de 1 (factor logarítmico) o menor si A* poda bien.")
-    common.write_table("T4_complexity", "Complejidad teórica vs medida", cols, table, note)
 
 
 def c1(rows):

@@ -62,8 +62,8 @@ def build_distance_matrix(
     warehouse: WareHouse | None = None
 ) -> np.ndarray:
     """
-    Construye la matriz simétrica de distancias (NxN) entre los productos.
-    Soporta métrica 'e' (línea recta) o 't' (pasos reales de pasillo).
+    Construye la matriz de distancias (NxN) entre los productos.
+    Soporta métrica 'e' (línea recta) o 't' (pasos reales de pasillo dirigidos).
     """
     n = len(products)
     dist_matrix = np.full((n, n), np.inf, dtype=float)
@@ -85,7 +85,6 @@ def build_distance_matrix(
         # 1. Obtenemos el nodo de pasillo de acceso para cada producto
         access_nodes = [get_product_access_node(p) for p in products]
 
-
         # 2. Calculamos las distancias entre nodos a partir de BFS
         targets = LinkedList()
         unique_nodes = set()
@@ -97,26 +96,19 @@ def build_distance_matrix(
         distance_maps = {}
         for node_id in unique_nodes:
             distance_maps[node_id] = bfs_distances_targeted(warehouse.graph, node_id, targets)
-        # 3. Llenamos la matriz simetrizando los caminos de ida y vuelta
 
+        # 3. Llenamos toda la matriz calculando todas las distancias dirigidas (i -> j)
         for i in range(n):
             u = access_nodes[i]
-            for j in range(i + 1, n):
+            for j in range(n):
+                if i == j:
+                    continue
                 v = access_nodes[j]
                 if u == v:
-                    dist_efectiva = 0.0
+                    dist_matrix[i, j] = 0.0
                 else:
                     d_uv = search(distance_maps[u], v)
-                    d_vu = search(distance_maps[v], u)
-
-                    d_uv = float(d_uv) if d_uv is not None else math.inf
-                    d_vu = float(d_vu) if d_vu is not None else math.inf
-
-                    # En pasillos con sentido único, tomamos la ruta más corta válida
-                    dist_efectiva = min(d_uv, d_vu)
-
-                dist_matrix[i, j] = dist_efectiva
-                dist_matrix[j, i] = dist_efectiva
+                    dist_matrix[i, j] = float(d_uv) if d_uv is not None else math.inf
     else:
         raise ValueError("Métrica inválida. Use 'e' o 't'.")
 
@@ -139,16 +131,19 @@ def build_similarity_matrix(distance_matrix: np.ndarray) -> np.ndarray:
 # PASO 2, 3 Y 4: LAPLACIANO, AUTOVECTORES Y EMBEDDING ESPECTRAL
 # =====================================================================
 def compute_laplacian_matrix(similarity_matrix: np.ndarray, normalized: bool = True) -> np.ndarray:
-    n_points = similarity_matrix.shape[0]
-    degrees = np.sum(similarity_matrix, axis=1)
+    # Simetrizamos W al armar el Laplaciano para incorporar tanto d(i->j) como d(j->i)
+    # sin que np.linalg.eigh descarte el triángulo superior cuando las distancias son dirigidas.
+    W = 0.5 * (similarity_matrix + similarity_matrix.T)
+    n_points = W.shape[0]
+    degrees = np.sum(W, axis=1)
 
     if not normalized:
-        return np.diag(degrees) - similarity_matrix
+        return np.diag(degrees) - W
 
     degrees_inv_sqrt = np.where(degrees > 1e-12, 1.0 / np.sqrt(degrees), 0.0)
     D_inv_sqrt = np.diag(degrees_inv_sqrt)
     I = np.eye(n_points)
-    return I - (D_inv_sqrt @ similarity_matrix @ D_inv_sqrt)
+    return I - (D_inv_sqrt @ W @ D_inv_sqrt)
 
 
 def compute_eigenvectors(laplacian_matrix: np.ndarray, num_clusters: int) -> np.ndarray:
@@ -263,14 +258,14 @@ def main(
     ]
 
     # Impresión limpia de resultados para el test
-    # print("=" * 70)
+    print("=" * 70)
     print(f" RESULTADO CLUSTERING ESPECTRAL (Métrica: {metric.upper()} | Zonas K={len(non_empty)})")
-    # print("=" * 70)
-    # for idx, (prod_list, coord_list) in enumerate(non_empty, start=1):
-    #     nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
-    #     print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
-    #     print(f"    Coordenadas (x, y) : {coord_list}")
-    # print("=" * 70)
+    print("=" * 70)
+    for idx, (prod_list, coord_list) in enumerate(non_empty, start=1):
+        nombres_prods = ", ".join(f"{p.id}@({p.x},{p.y})" for p in prod_list)
+        print(f"  • Zona {idx} ({len(prod_list)} productos): {nombres_prods}")
+        print(f"    Coordenadas (x, y) : {coord_list}")
+    print("=" * 70)
 
     return [p_list for p_list, _ in non_empty]
 

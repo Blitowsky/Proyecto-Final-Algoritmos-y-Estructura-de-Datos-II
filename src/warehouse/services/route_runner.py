@@ -14,6 +14,7 @@ from warehouse.domain.warehouse import WareHouse
 from warehouse.domain.location import DispatchZone
 
 from warehouse.algorithms.pathfinding import SearchResult, find_path
+from warehouse.services.order_service import update_orders_from_deliveries
 
 def move_picker(
     picker: Picker,
@@ -161,14 +162,8 @@ def perform_leg_action(picker: Picker, warehouse: WareHouse, leg: Leg) -> None:
             line.value.product.release(line.value.qty)
             line = line.nextNode
     elif leg.kind == "return":
-
-        leg.items = picker.drop_off(
-            warehouse
-        )
-
-        leg.completed_orders = update_orders_from_deliveries(
-            warehouse
-        )
+        leg.items = picker.drop_off(warehouse)
+        leg.completed_orders = update_orders_from_deliveries(warehouse)
 
 def visit(
     picker: Picker,
