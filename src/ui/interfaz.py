@@ -787,19 +787,30 @@ class Ventana(QWidget):
 
 
 app = QApplication(sys.argv)
-
+"""
 #Cargo el escenario
 config = load_config("src/data/escenario_grande_mod.json")
 
 #Construyo el warehouse
-warehouse, noValido = build_warehouse(config)
-"""
+#warehouse, noValido = build_warehouse(config)
+
 #Creo las waves a partir de los pedidos
 waves, rejected = WaveBuilder(
     warehouse,
     pickers=warehouse.pickers
 ).build()
 """
+
+
+
+
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
+config = load_config(SCENARIO)
+
+#Construyo el warehouse
+warehouse, noValido = build_warehouse(config)
+
+selector = ProductCentroidSelector(warehouse, warehouse.orders)
 
 waves= generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
 
@@ -808,17 +819,7 @@ for wave in waves:
     for w in wave:
         add(wavesWareHouse,w)
 warehouse.waves=wavesWareHouse
-
-
-#####
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_05_grande_mixto.json")
-config = load_config(SCENARIO)
-
-#Construyo el warehouse
-warehouse = build_warehouse(config)
-
-selector = ProductCentroidSelector(warehouse, warehouse.orders)
-waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
+#waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
 
 #Creo la simulacion
 simulation = Simulation(

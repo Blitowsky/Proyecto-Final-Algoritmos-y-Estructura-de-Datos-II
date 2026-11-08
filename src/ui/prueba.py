@@ -790,20 +790,20 @@ class Ventana(QWidget):
 
 
 app = QApplication(sys.argv)
-"""
+
 #Cargo el escenario
 config = load_config("src/data/escenario_grande_mod.json")
 
 #Construyo el warehouse
 warehouse, noValido = build_warehouse(config)
 
-
+"""v
 #Creo las waves a partir de los pedidos
 waves, rejected = WaveBuilder(
     warehouse,
     pickers=warehouse.pickers
 ).build()
-
+"""
 
 waves= generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
 
@@ -825,13 +825,8 @@ save(simulation)
 
 
 
-simulation = Simulation(
-    warehouse=WareHouse(),
-    algorithm="astar",
-    auto_assign=True
-)
 
-"""
+
 simulation=None
 
 simulation=load()
