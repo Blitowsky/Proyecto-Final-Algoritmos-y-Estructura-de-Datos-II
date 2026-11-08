@@ -1,9 +1,9 @@
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt
-from src.ui.canvas.warehouse_canvas import WarehouseCanvas
-from src.ui.canvas.warehouse_scene import WarehouseScene
-from src.ui.widgets.simulation_controls import SimulationControls
-from src.ui.controllers.ui_controller import UIController
+from ui.canvas.warehouse_canvas import WarehouseCanvas
+from ui.canvas.warehouse_scene import WarehouseScene
+from ui.widgets.simulation_controls import SimulationControls
+from ui.controllers.ui_controller import UIController
 
 class MainWindow(QMainWindow):
     def __init__(self, graph_data, route_sample):

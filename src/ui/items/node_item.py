@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QGraphicsEllipseItem
 from PyQt6.QtGui import QBrush, QPen, QColor
-from src.ui.styles import colors
+from ui.styles import colors
 
 class NodeItem(QGraphicsEllipseItem):
     def __init__(self, node_id: str, x: float, y: float, node_type: str, radius: float = 12):

@@ -7,12 +7,14 @@ from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
 from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
+from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
 from warehouse.services.wave_builder import WaveBuilder
 from warehouse.simulation.simulation import Simulation
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
 from warehouse.domain.direction import N, S, E, O, AMBOS
 from warehouse.structures.linkedlist import LinkedList, add
+import clustering.spectral as cs
 
 
 #Tipos de celdas que puede tener el warehouse
@@ -754,13 +756,30 @@ class Ventana(QWidget):
 app = QApplication(sys.argv)
 
 #Cargo el escenario
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_05_grande_mixto.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 config = load_config(SCENARIO)
 
 #Construyo el warehouse
 warehouse = build_warehouse(config)
 
-selector = ProductCentroidSelector(warehouse, warehouse.orders)
+# selector = ProductCentroidSelector(warehouse, warehouse.orders)
+
+K_ZONAS = 4
+
+zonas_espectrales = cs.main(
+    warehouse=warehouse,
+    k_zones=K_ZONAS,
+    metric="e"
+)
+print()
+
+selector = SpectralWaveSelector(
+    warehouse=warehouse,
+    spectral_zones=zonas_espectrales,
+    pickers=warehouse.pickers
+)
+
+
 waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
 
 #Creo la simulacion

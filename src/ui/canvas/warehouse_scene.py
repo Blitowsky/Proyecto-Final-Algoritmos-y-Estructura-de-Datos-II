@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsLineItem
 from PyQt6.QtGui import QPen
-from src.ui.items.node_item import NodeItem
-from src.ui.styles import colors
+from ui.items.node_item import NodeItem
+from ui.styles import colors
 
 class WarehouseScene(QGraphicsScene):
     def __init__(self, parent=None):
