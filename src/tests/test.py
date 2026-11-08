@@ -1,6 +1,7 @@
-import os
 
+import os
 from warehouse.algorithms.pathfinding import find_path
+from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
 from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.hall_graph_builder import build_hall_graph
@@ -11,6 +12,7 @@ from warehouse.services.wave_runner import process_pending
 from warehouse.simulation.simulation import Simulation
 from warehouse.structures.linkedlist import LinkedList, add, length
 from warehouse.visualization.ascii_map import render_map, render_rows
+import clustering.spectral as cs
 
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 
@@ -40,88 +42,26 @@ def test_grid(floor):
 test_grid(warehouse.floor)
 print()
 
-# warehouse.graph.printGraph()
 
-# 55 (picker) -> (1, 3); 92 -> (2, 5); 177 -> (15, 9); 95 -> (5, 5) 
-# picker0 = warehouse.pickers.head.value
-# targets = LinkedList()
-# # add(targets, 177)
-# add(targets, 95)
-# path_bfs = find_path(warehouse, 55, targets, "bfs")
-# path_dijkstra = find_path(warehouse, 55, targets, "dijkstra")
-# path_astar = find_path(warehouse, 55, targets, "astar")
-#
-# print("BFS:")
-# if path_bfs:
-#     print(f"Expanded: {path_bfs.expanded}; Examined: {path_bfs.examined}; Nodes: {path_bfs.nodes}")
-#     node = path_bfs.path.head
-#     while node is not None:
-#         if node.value:
-#             print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#         node = node.nextNode
-#     print("None")
-# print("DIJKSTRA:")
-# if path_dijkstra:
-#     print(f"Expanded: {path_dijkstra.expanded}; Examined: {path_dijkstra.examined}; Nodes: {path_dijkstra.nodes}")
-#     node = path_dijkstra.path.head
-#     while node is not None:
-#         if node.value:
-#             print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#         node = node.nextNode
-#     print("None")
-# print("A*:")
-# if path_astar:
-#     print(f"Expanded: {path_astar.expanded}; Examined: {path_astar.examined}; Nodes: {path_astar.nodes}")
-#     node = path_astar.path.head
-#     while node is not None:
-#         if node.value:
-#             print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#         node = node.nextNode
-#     print("None")
-# print()
-#
-# route = move_picker(picker0, warehouse, targets, "astar")
-# picker0_node = LinkedList()
-# add(picker0_node, picker0.node)
-# print(render_map(warehouse.floor, picker0_node))
+K_ZONAS = 4
 
-# waves, rejected = process_pending(warehouse)
-# print("WAVES: ")
-# for wave in list(waves):
-#     if wave is None:
-#         continue
-#     print(f"Wave {wave.id} ({wave.status})")
-#     print(f"Orders: {", ".join([o.id for o in list(wave.orders)])}")
-#     for line in list(wave.lines):
-#         if line is None:
-#             continue
-#         x = line.product.cell.x
-#         y = line.product.cell.y
-#         z = line.product.z
-#         print(f"{line.product.id}; {line.product.weight}kg ({line.qty}) <{x}, {y}, {z}>")
-#     print("Assignments:")
-#     for i, assignment in enumerate(list(wave.assignments)):
-#         if assignment is None:
-#             continue
-#         print(f"Assignment {i}; picker {assignment.picker.id} ({assignment.picker.capacity}kg); dispatch zone {assignment.zone.id}:")
-#         for leg in list(assignment.route.legs):
-#             if leg is None:
-#                 continue
-#             node = leg.path.head
-#             while node is not None:
-#                 if node.value:
-#                     print((node.value % warehouse.width, node.value // warehouse.width), end=" -> ")
-#                 node = node.nextNode
-#             print("None")
-#     print()
-#
-# print("REJECTED: ", length(rejected))
-# print()
-#
-# print(render_map(warehouse.floor, picker_current_cells(warehouse)))
+zonas_espectrales = cs.main(
+    warehouse=warehouse,
+    k_zones=K_ZONAS,
+    metric="t"
+)
+print()
 
-selector = ProductCentroidSelector(warehouse, warehouse.orders)
+selector = SpectralWaveSelector(
+    warehouse=warehouse,
+    spectral_zones=zonas_espectrales,
+    pickers=warehouse.pickers
+)
 waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
+print()
+
+# selector = ProductCentroidSelector(warehouse, warehouse.orders)
+# waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
 # CON generacion de waves
 # {'ticks': 1366, 'assignments': 11, 'planned_distance': 4739.0, 'steps': 4751, 'waits': 15, 'reroutes': 7, 'side_steps': 0}
 
@@ -134,12 +74,15 @@ waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pi
 simulation = Simulation(
         warehouse,
         algorithm="bfs",
+        stop_orderer=selector,
         auto_assign=True
     )
 
 simulation.run()
 
 print(simulation.summary())
+preparados = sum(1 for o in warehouse.orders if o is not None and o.state == "PREPARADO")
+print(f"Pedidos preparados tras entregas: {preparados}/{length(warehouse.orders)}")
 print()
 
 for event in simulation.events:

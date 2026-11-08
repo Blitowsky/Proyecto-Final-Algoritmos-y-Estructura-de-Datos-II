@@ -4,7 +4,7 @@ en el proceso de inicialización.
 """
 
 from warehouse.domain.warehouse import Floor
-from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, Dictionary, search, insert
 from warehouse.domain.product import Product
 from warehouse.persistence.scenario_loader import (require_keys, require_int, require_id, require_positive_number, read_point)
 from warehouse.structures.linkedlist import add, length
@@ -12,7 +12,7 @@ from warehouse.structures.linkedlist import add, length
 def load_products(config: dict, floor: Floor) -> Dictionary:
     """Retorna una hash table con (`ID` producto) -> (`Product`)"""
     product_list = config.get("productos", [])
-    products = Dictionary(2 * len(product_list) + 1)
+    products = CloseDictionary(2 * len(product_list) + 1)
 
     for i in range(len(product_list)):
         p = product_list[i]

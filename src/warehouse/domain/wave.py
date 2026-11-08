@@ -16,7 +16,7 @@ What changed from your version (every change is marked "M3"):
 """
 
 from warehouse.structures.linkedlist import LinkedList, add
-from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, search, insert
 
 from warehouse.domain.product import Product
 from warehouse.domain.order import Order
@@ -50,7 +50,7 @@ class Wave:
 
         self.orders: LinkedList = LinkedList()
         self.lines: LinkedList = LinkedList()
-        self.line_index: Dictionary = Dictionary(2 * config.max_products + 1)
+        self.line_index: CloseDictionary = CloseDictionary(2 * config.max_products + 1)
 
         self.order_count: int = 0
         self.product_count: int = 0
@@ -61,6 +61,7 @@ class Wave:
         self.status: str = "created"
         self.assignments: LinkedList = LinkedList()
         self.assignment_count: int = 0
+        self.planned_shares: list | None = None
 
     def why_not(self, order: Order) -> str|None:
         """
@@ -100,7 +101,8 @@ class Wave:
         line = order.lines.head
         while line is not None:           
             if line.value is None:
-                continue
+                line = line.nextNode
+                continue    
 
             pid = line.value.product.id
             product_line = search(self.line_index, pid)
@@ -210,6 +212,33 @@ class Wave:
                 order.assign_to(self)
             
 
+    def add_product_line(self, product: Product, qty: int, priority: int = 0) -> None:
+        """Agrega unidades de un `Product` directamente a la wave (sin acoplarla
+        a un `Order` completo) y reserva su stock."""
+        if isinstance(qty, bool) or not isinstance(qty, int) or qty <= 0:
+            raise ValueError(f"La cantidad del producto {product.id} debe ser un entero positivo.")
+        available = product.available
+        if available is not None and qty > available:
+            raise ValueError(
+                f"Se pidieron {qty} unidades de {product.id}, pero solo quedan {available} sin reservar."
+            )
+
+        pid = product.id
+        product_line = search(self.line_index, pid)
+        if product_line is not None and product_line.product.id == pid:
+            product_line.qty += qty
+        else:
+            wave_line = WaveLine(product, qty)
+            add(self.lines, wave_line)
+            insert(self.line_index, wave_line, pid)
+            self.product_count += 1
+
+        self.total_units += qty
+        self.total_weight += product.weight * qty
+        if priority > self.top_priority:
+            self.top_priority = priority
+        product.reserve(qty)
+
     def release_stock(self) -> None:
         line = self.lines.head
         while line is not None:
@@ -217,6 +246,7 @@ class Wave:
                 line = line.nextNode
                 continue
             line.value.product.release(line.value.qty)
+            line = line.nextNode    
 
 class Assignment:
     """

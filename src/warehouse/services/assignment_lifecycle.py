@@ -38,12 +38,10 @@ def start_assignment(
     stops = assignment.stops
     order_time = None
     if stop_orderer is not None:
-        # TODO
-        stops = stop_orderer(warehouse, picker.node, stops, assignment.zone)
         begin = picker.node
         stops, order_time = _order_stops(warehouse, begin, stops, assignment.zone, stop_orderer)
 
-    route = plan_route(warehouse, picker.node, stops, assignment.zone)
+    route = plan_route(warehouse, picker.node, stops, assignment.zone, algorithm)
     route.order_time = order_time
     _check_can_serve(picker, route)
 

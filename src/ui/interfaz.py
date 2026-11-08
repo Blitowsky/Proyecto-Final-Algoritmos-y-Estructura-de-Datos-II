@@ -824,7 +824,7 @@ warehouse.waves=wavesWareHouse
 #Creo la simulacion
 simulation = Simulation(
     warehouse,
-    algorithm="astar",
+    algorithm="bfs",
     auto_assign=True
 )
 

@@ -226,6 +226,10 @@ class Simulation:
         return out
 
     def _assign_created_waves(self) -> None:
+        last_error: ValueError | None = None
+
+        # Pasada 1: asignamos cada wave disponible a su picker preferido (sin bloquear las siguientes
+        # si un picker todavía está ocupado en una wave anterior).
         wave = self.warehouse.waves.head
         while wave is not None:
             if wave.value is None or wave.value.status != "created":
@@ -235,11 +239,42 @@ class Simulation:
             if len(free_picks) == 0:
                 return
             try:
-                assign_wave(self.warehouse, wave.value, None, self.algorithm)
-            except ValueError:
-                if len(self.walkers) == 0 and len(free_picks) == length(self.warehouse.pickers):
-                    raise
+                assign_wave(self.warehouse, wave.value, None, self.algorithm, allow_fallback=False)
+            except ValueError as exc:
+                last_error = exc
             wave = wave.nextNode
+
+        # Pasada 2: si aún quedan pickers libres, les reasignamos waves individuales pendientes
+        # que entren en su capacidad para que ningún picker quede ocioso esperando a otros.
+        remaining_free = free_pickers(self.warehouse)
+        if remaining_free:
+            fallback_candidates = []
+            wave = self.warehouse.waves.head
+            while wave is not None:
+                if (
+                    wave.value is not None
+                    and wave.value.status == "created"
+                    and getattr(wave.value, "planned_shares", None) is not None
+                    and len(wave.value.planned_shares) == 1
+                ):
+                    fallback_candidates.append(wave.value)
+                wave = wave.nextNode
+
+            fallback_candidates.sort(key=lambda w: (-w.total_weight, str(w.id)))
+            for w in fallback_candidates:
+                if len(free_pickers(self.warehouse)) == 0:
+                    return
+                try:
+                    assign_wave(self.warehouse, w, None, self.algorithm, allow_fallback=True)
+                except ValueError as exc:
+                    last_error = exc
+
+        if (
+            last_error is not None
+            and len(self.walkers) == 0
+            and len(free_pickers(self.warehouse)) == length(self.warehouse.pickers)
+        ):
+            raise last_error
 
     def _start_assigned(self, out: list[Event]) -> None:
         p = self.warehouse.pickers.head
@@ -307,13 +342,17 @@ class Simulation:
                     weight += item.value.weight
                     count += 1
                 item = item.nextNode
+            detail = f"{count} productos, {round(weight, 3)}kg"
+            completed = getattr(leg, "completed_orders", None)
+            if completed:
+                detail += f" | pedidos listos: {', '.join(str(o.id) for o in completed)}"
             out.append(Event(
                 self.tick,
                 picker.id,
                 "drop",
                 current,
                 None,
-                f"{count} productos, {round(weight, 3)}kg"
+                detail   
             ))
 
     def _refused(
