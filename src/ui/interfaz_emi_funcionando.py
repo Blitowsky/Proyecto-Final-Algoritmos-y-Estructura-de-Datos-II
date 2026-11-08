@@ -1,7 +1,11 @@
 import sys
 import math
+import os
+import clustering.spectral as cs
 
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit
+from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
+from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QTextEdit, QDialog, QVBoxLayout, QComboBox, QSpinBox, QDialogButtonBox
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
 from PyQt6.QtCore import QTimer
 
@@ -10,17 +14,189 @@ from warehouse.simulation.simulation import Simulation
 from warehouse.persistence.scenario_loader import load_config
 from warehouse.services.warehouse_loader import build_warehouse
 from warehouse.domain.direction import N, S, E, O, AMBOS
-from warehouse.algorithms.generacioWave import generacionWaves
-from warehouse.structures.linkedlist import LinkedList, add
 
 
 #Tipos de celdas que puede tener el warehouse
 from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 
 
+#estrategia del centroide
+from warehouse.algorithms.generacioWave import generacionWaves
+
+# ==================================================
+# MENU OPCIONES DE ESTRATEGIA
+# ==================================================
+
+class DialogoEstrategia(QDialog):
+
+    def __init__(self, max_zonas):
+
+        super().__init__()
+
+        self.setWindowTitle(
+            "Configuracion de estrategia"
+        )
+
+        self.setMinimumWidth(350)
+
+        #Layout vertical del dialogo
+        layout = QVBoxLayout(self)
+
+
+        # ==================================================
+        # ESTRATEGIA
+        # ==================================================
+
+        layout.addWidget(
+            QLabel("Estrategia de generacion de Waves:")
+        )
+
+        self.combo_estrategia = QComboBox()
+
+        #El segundo valor queda guardado internamente
+        self.combo_estrategia.addItem(
+            "Centroide",
+            "centroide"
+        )
+
+        self.combo_estrategia.addItem(
+            "Clustering espectral",
+            "clustering"
+        )
+
+        layout.addWidget(
+            self.combo_estrategia
+        )
+
+
+        # ==================================================
+        # CANTIDAD DE ZONAS K
+        # ==================================================
+
+        layout.addWidget(
+            QLabel("Cantidad de zonas (K):")
+        )
+
+        self.spin_k = QSpinBox()
+
+        self.spin_k.setMinimum(1)
+
+        self.spin_k.setMaximum(
+            max(1, max_zonas)
+        )
+
+        self.spin_k.setValue(
+            min(4, max(1, max_zonas))
+        )
+
+        layout.addWidget(
+            self.spin_k
+        )
+
+
+        # ==================================================
+        # METRICA
+        # ==================================================
+
+        layout.addWidget(
+            QLabel("Metrica del clustering:")
+        )
+
+        self.combo_metrica = QComboBox()
+
+        self.combo_metrica.addItem(
+            "Topologica",
+            "t"
+        )
+
+        self.combo_metrica.addItem(
+            "Euclidiana",
+            "e"
+        )
+
+        layout.addWidget(
+            self.combo_metrica
+        )
+
+
+        # ==================================================
+        # BOTONES
+        # ==================================================
+
+        self.botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+
+        #Si toca OK cierro aceptando
+        self.botones.accepted.connect(
+            self.accept
+        )
+
+        #Si toca Cancelar cierro rechazando
+        self.botones.rejected.connect(
+            self.reject
+        )
+
+        layout.addWidget(
+            self.botones
+        )
+
+
+        # ==================================================
+        # CAMBIO DE ESTRATEGIA
+        # ==================================================
+
+        self.combo_estrategia.currentIndexChanged.connect(
+            self.actualizar_opciones
+        )
+
+        self.actualizar_opciones()
+
+
+    def actualizar_opciones(self):
+
+        #Obtengo el valor interno del combo
+        estrategia = self.combo_estrategia.currentData()
+
+        #K y metrica solo tienen sentido para clustering
+        usa_clustering = (
+            estrategia == "clustering"
+        )
+
+        self.spin_k.setEnabled(
+            usa_clustering
+        )
+
+        self.combo_metrica.setEnabled(
+            usa_clustering
+        )
+
+
+    def estrategia(self):
+
+        return self.combo_estrategia.currentData()
+
+
+    def k_zonas(self):
+
+        return self.spin_k.value()
+
+
+    def metrica(self):
+
+        return self.combo_metrica.currentData()
+
+
+# ==================================================
+# VENTANA INTERFAZ GRAFICA
+# ==================================================
+
+
 class Ventana(QWidget):
 
-    def __init__(self, warehouse, simulation):
+    def __init__(self, warehouse, simulation, zonas_espectrales=None, estrategia="centroide", k_zonas=None, metrica=None):
         super().__init__()
 
         #Guardo el warehouse que recibo
@@ -28,6 +204,30 @@ class Ventana(QWidget):
         
         #Guardo la simulacion
         self.simulation = simulation
+        
+        #Guardo las zonas generadas por clustering
+        self.zonas_espectrales = zonas_espectrales
+        
+        #Guardo la estrategia utilizada
+        self.estrategia = estrategia
+        self.k_zonas = k_zonas
+        self.metrica = metrica
+
+        #Diccionario para saber rapidamente
+        #a que zona pertenece cada producto
+        self.zona_producto = {}
+        
+        if self.zonas_espectrales is not None:
+
+            numero_zona = 1
+
+            for zona in self.zonas_espectrales:
+
+                for producto in zona:
+
+                    self.zona_producto[producto.id] = numero_zona
+
+                numero_zona += 1
 
         #Espacio que dejo alrededor del warehouse
         self.margen = 60
@@ -36,8 +236,18 @@ class Ventana(QWidget):
         self.escala = 1
         
         #Imagenes de la interfaz
-        self.imagen_picker = QPixmap("src/ui/assets/construction-worker.png")
-        self.imagen_producto = QPixmap("src/ui/assets/box.png")
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "assets"
+        )
+
+        self.imagen_picker = QPixmap(
+            os.path.join(assets_dir, "construction-worker.png")
+        )
+
+        self.imagen_producto = QPixmap(
+            os.path.join(assets_dir, "box.png")
+        )
         
         
         #Timer que va avanzando la simulacion
@@ -46,8 +256,13 @@ class Ventana(QWidget):
         #Cada vez que el timer se activa ejecuto un tick
         self.timer.timeout.connect(self.avanzar_simulacion)
 
+        #Intervalo inicial entre ticks
+        self.intervalo_actual = 300
+
         #Tiempo entre ticks
-        self.timer.setInterval(1)
+        self.timer.setInterval(
+            self.intervalo_actual
+        )
         
         
         # ==================================================
@@ -72,6 +287,19 @@ class Ventana(QWidget):
         self.boton_paso.setGeometry(210, 10, 80, 30)
         self.boton_paso.clicked.connect(self.paso)
         
+        #Boton para mostrar la velocidad actual
+        self.label_velocidad = QLabel("Intervalo: 300 ms", self)
+
+        #Boton para acelerar al doble
+        self.boton_acelerar = QPushButton("x2", self)
+
+        self.boton_acelerar.clicked.connect(self.acelerar_simulacion)
+
+        #Boton para volver a la velocidad inicial
+        self.boton_velocidad_normal = QPushButton("x1",self)
+
+        self.boton_velocidad_normal.clicked.connect(self.restablecer_velocidad)
+        
         # ==================================================
         # TICK ACTUAL
         # ==================================================
@@ -88,11 +316,43 @@ class Ventana(QWidget):
         #No permito que el usuario escriba
         self.panel_eventos.setReadOnly(True)
 
-        #Posicion y tamaño
-        self.panel_eventos.setGeometry(920, 60, 400, 550)
+        #Espacio reservado para el panel de eventos
+        self.ancho_panel = 400
+        self.separacion_panel = 30
+        self.margen_derecho = 30
 
         #Texto inicial
         self.panel_eventos.setPlainText("Eventos de la simulacion:\n")
+        
+        # ==================================================
+        # INFORMACION DE ESTRATEGIA
+        # ==================================================
+
+        if self.estrategia == "centroide":
+
+            texto_estrategia = "Estrategia: Centroide"
+
+        else:
+
+            nombre_metrica = (
+                "Topologica"
+                if self.metrica == "t"
+                else "Euclidiana"
+            )
+
+            texto_estrategia = (
+                f"Estrategia: Clustering espectral | "
+                f"K={self.k_zonas} | {nombre_metrica}"
+            )
+
+        self.label_estrategia = QLabel(
+            texto_estrategia,
+            self
+        )
+
+        self.label_estrategia.setStyleSheet(
+            "font-weight: bold;"
+        )
         
         # ==================================================
         # ESTADO VISUAL DE LOS PICKERS
@@ -110,6 +370,29 @@ class Ventana(QWidget):
                 self.estado_pickers[picker.id] = "Libre"
 
             actual_picker = actual_picker.nextNode
+    
+    def color_zona(self, zona):
+
+        if zona is None:
+            return QColor("black")
+
+        cantidad_zonas = len(self.zonas_espectrales)
+
+        if cantidad_zonas == 0:
+            return QColor("black")
+
+        #Distribuyo los colores alrededor del circulo HSV
+        tono = int(
+            ((zona - 1) * 359)
+            / cantidad_zonas
+        )
+
+        return QColor.fromHsv(
+            tono,
+            180,
+            220
+        )
+
 
     def formatear_evento(self, evento):
 
@@ -258,19 +541,125 @@ class Ventana(QWidget):
         #Avanzo solamente un tick
         self.avanzar_simulacion()
 
+    def acelerar_simulacion(self):
+
+        #Si ya estamos al maximo, no hago nada
+        if self.intervalo_actual == 0:
+            return
+
+        #Reduzco el intervalo a la mitad
+        self.intervalo_actual = (
+            self.intervalo_actual // 2
+        )
+
+        #Aplico el nuevo intervalo al timer
+        self.timer.setInterval(
+            self.intervalo_actual
+        )
+
+        #Actualizo el texto mostrado
+        self.label_velocidad.setText(
+            f"Intervalo: {self.intervalo_actual} ms"
+        )
+
+        #Si llego a cero, deshabilito el boton
+        self.boton_acelerar.setEnabled(
+            self.intervalo_actual > 0
+        )
+
+
+    def restablecer_velocidad(self):
+
+        #Vuelvo al intervalo original
+        self.intervalo_actual = 300
+
+        self.timer.setInterval(
+            self.intervalo_actual
+        )
+
+        self.label_velocidad.setText(
+            "Intervalo: 300 ms"
+        )
+
+        #Vuelvo a habilitar el boton x2
+        self.boton_acelerar.setEnabled(True)
+
     def calcular_escala(self):
 
-        #Espacio disponible para dibujar dentro de la ventana
-        ancho_disponible = self.width() - 2 * self.margen
+        #Al ancho de la ventana le resto el espacio
+        #que necesita el panel de eventos
+        ancho_disponible = (
+            self.width()
+            - self.margen
+            - self.ancho_panel
+            - self.separacion_panel
+            - self.margen_derecho
+        )
+
         alto_disponible = self.height() - 2 * self.margen
 
-        #Calculo cuanto puede medir cada celda
         escala_x = ancho_disponible // self.warehouse.width
         escala_y = alto_disponible // self.warehouse.height
 
-        #Uso la escala mas chica para asegurarme de que entre todo
         return max(1, min(escala_x, escala_y))
 
+    def resizeEvent(self, event):
+
+        #Calculo la posicion del panel derecho
+        x_panel = (
+            self.width()
+            - self.ancho_panel
+            - self.margen_derecho
+        )
+
+        # ==================================================
+        # ESTRATEGIA
+        # ==================================================
+
+        self.label_estrategia.setGeometry(
+            x_panel,
+            8,
+            self.ancho_panel,
+            26
+        )
+
+        # ==================================================
+        # VELOCIDAD
+        # ==================================================
+
+        self.label_velocidad.setGeometry(
+            x_panel,
+            40,
+            160,
+            28
+        )
+
+        self.boton_acelerar.setGeometry(
+            x_panel + 170,
+            40,
+            75,
+            28
+        )
+
+        self.boton_velocidad_normal.setGeometry(
+            x_panel + 255,
+            40,
+            75,
+            28
+        )
+
+        # ==================================================
+        # PANEL DE EVENTOS
+        # ==================================================
+
+        self.panel_eventos.setGeometry(
+            x_panel,
+            80,
+            self.ancho_panel,
+            self.height() - 120
+        )
+
+        super().resizeEvent(event)
 
     def coordenada_a_pixel(self, x, y):
 
@@ -648,6 +1037,28 @@ class Ventana(QWidget):
                         #Tamaño de la caja
                         tamano_producto = min(self.escala // 2, 18)
 
+                        zona = self.zona_producto.get(
+                            producto.id
+                        )
+
+                        if zona is not None:
+
+                            color = self.color_zona(zona)
+
+                            painter.setPen(
+                                QPen(color, 3)
+                            )
+
+                            painter.setBrush(
+                                QBrush()
+                            )
+
+                            painter.drawRect(
+                                xp + 1,
+                                yp + 1,
+                                self.escala - 2,
+                                self.escala - 2
+                            )
                         #Dibujo la imagen del producto centrada en la celda
                         painter.drawPixmap(
                             xp + (self.escala - tamano_producto) // 2,
@@ -754,35 +1165,126 @@ app = QApplication(sys.argv)
 config = load_config("src/data/escenario_grande.json")
 
 #Construyo el warehouse
-warehouse, noValido = build_warehouse(config)
-"""
-#Creo las waves a partir de los pedidos
-waves, rejected = WaveBuilder(
-    warehouse,
-    pickers=warehouse.pickers
-).build()
-"""
-
-waves= generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
-
-wavesWareHouse = LinkedList()
-for wave in waves:
-    for w in wave:
-        add(wavesWareHouse,w)
-warehouse.waves=wavesWareHouse
+warehouse = build_warehouse(config)
 
 
+# ==================================================
+# CONFIGURACION DE ESTRATEGIA
+# ==================================================
 
-#Creo la simulacion
+#Obtengo los productos considerados por el clustering
+productos_clustering = cs.extract_pending_products(
+    warehouse
+)
+
+#Creo el dialogo y establezco el maximo de zonas
+dialogo = DialogoEstrategia(
+    max_zonas=max(1, len(productos_clustering))
+)
+
+#Muestro el dialogo y espero la eleccion del usuario
+resultado = dialogo.exec()
+
+#Si el usuario cancela, termina el programa
+if resultado != QDialog.DialogCode.Accepted:
+    sys.exit(0)
+
+
+#Obtengo la estrategia elegida
+estrategia = dialogo.estrategia()
+
+#Por defecto no tenemos zonas espectrales
+zonas_espectrales = None
+K_ZONAS = None
+METRICA = None
+
+
+# ==================================================
+# ESTRATEGIA CENTROIDE
+# ==================================================
+
+if estrategia == "centroide":
+
+    print("Estrategia seleccionada: Centroide")
+    """
+    selector = ProductCentroidSelector(
+        warehouse,
+        warehouse.orders
+    )
+    """
+    generacionWaves(warehouse)
+    
+
+# ==================================================
+# ESTRATEGIA CLUSTERING ESPECTRAL
+# ==================================================
+
+elif estrategia == "clustering":
+
+    #Obtengo las opciones elegidas por el usuario
+    K_ZONAS = dialogo.k_zonas()
+    METRICA = dialogo.metrica()
+
+    print("Estrategia seleccionada: Clustering espectral")
+    print("K:", K_ZONAS)
+    print("Metrica:", METRICA)
+
+    if not productos_clustering:
+        raise ValueError(
+            "No hay productos en pedidos pendientes para clusterizar."
+        )
+
+    #Calculo las zonas
+    zonas_espectrales = cs.main(
+        warehouse=warehouse,
+        k_zones=K_ZONAS,
+        metric=METRICA
+    )
+
+    #Creo el selector espectral
+    selector = SpectralWaveSelector(
+        warehouse=warehouse,
+        spectral_zones=zonas_espectrales,
+        pickers=warehouse.pickers
+    )
+
+    # ==================================================
+    # GENERACION DE WAVES
+    # ==================================================
+
+    waves, rejected = WaveBuilder(
+        warehouse,
+        selector=selector,
+        pickers=warehouse.pickers
+    ).build()
+
+
+
+
+
+# ==================================================
+# SIMULACION
+# ==================================================
+
 simulation = Simulation(
     warehouse,
-    algorithm="astar",
+    algorithm="bfs",
     auto_assign=True
 )
 
 
-#Creo la ventana y le paso el warehouse y la simulacion
-ventana = Ventana(warehouse, simulation)
+# ==================================================
+# INTERFAZ GRAFICA
+# ==================================================
+
+ventana = Ventana(
+    warehouse,
+    simulation,
+    zonas_espectrales,
+    estrategia=estrategia,
+    k_zonas=K_ZONAS,
+    metrica=METRICA
+)
 
 ventana.showMaximized()
 
