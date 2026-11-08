@@ -19,6 +19,10 @@ from warehouse.domain.direction import N, S, E, O, AMBOS
 #Tipos de celdas que puede tener el warehouse
 from warehouse.domain.cell import HALL, RACK, DOOR, ZONE
 
+# ==================================================
+# MENU OPCIONES DE ESTRATEGIA
+# ==================================================
+
 class DialogoEstrategia(QDialog):
 
     def __init__(self, max_zonas):
@@ -180,9 +184,15 @@ class DialogoEstrategia(QDialog):
 
         return self.combo_metrica.currentData()
 
+
+# ==================================================
+# VENTANA INTERFAZ GRAFICA
+# ==================================================
+
+
 class Ventana(QWidget):
 
-    def __init__(self, warehouse, simulation, zonas_espectrales=None):
+    def __init__(self, warehouse, simulation, zonas_espectrales=None, estrategia="centroide", k_zonas=None, metrica=None):
         super().__init__()
 
         #Guardo el warehouse que recibo
@@ -193,6 +203,11 @@ class Ventana(QWidget):
         
         #Guardo las zonas generadas por clustering
         self.zonas_espectrales = zonas_espectrales
+        
+        #Guardo la estrategia utilizada
+        self.estrategia = estrategia
+        self.k_zonas = k_zonas
+        self.metrica = metrica
 
         #Diccionario para saber rapidamente
         #a que zona pertenece cada producto
@@ -237,8 +252,13 @@ class Ventana(QWidget):
         #Cada vez que el timer se activa ejecuto un tick
         self.timer.timeout.connect(self.avanzar_simulacion)
 
+        #Intervalo inicial entre ticks
+        self.intervalo_actual = 300
+
         #Tiempo entre ticks
-        self.timer.setInterval(0)
+        self.timer.setInterval(
+            self.intervalo_actual
+        )
         
         
         # ==================================================
@@ -262,6 +282,19 @@ class Ventana(QWidget):
         self.boton_paso = QPushButton("Paso", self)
         self.boton_paso.setGeometry(210, 10, 80, 30)
         self.boton_paso.clicked.connect(self.paso)
+        
+        #Boton para mostrar la velocidad actual
+        self.label_velocidad = QLabel("Intervalo: 300 ms", self)
+
+        #Boton para acelerar al doble
+        self.boton_acelerar = QPushButton("x2", self)
+
+        self.boton_acelerar.clicked.connect(self.acelerar_simulacion)
+
+        #Boton para volver a la velocidad inicial
+        self.boton_velocidad_normal = QPushButton("x1",self)
+
+        self.boton_velocidad_normal.clicked.connect(self.restablecer_velocidad)
         
         # ==================================================
         # TICK ACTUAL
@@ -288,6 +321,36 @@ class Ventana(QWidget):
         self.panel_eventos.setPlainText("Eventos de la simulacion:\n")
         
         # ==================================================
+        # INFORMACION DE ESTRATEGIA
+        # ==================================================
+
+        if self.estrategia == "centroide":
+
+            texto_estrategia = "Estrategia: Centroide"
+
+        else:
+
+            nombre_metrica = (
+                "Topologica"
+                if self.metrica == "t"
+                else "Euclidiana"
+            )
+
+            texto_estrategia = (
+                f"Estrategia: Clustering espectral | "
+                f"K={self.k_zonas} | {nombre_metrica}"
+            )
+
+        self.label_estrategia = QLabel(
+            texto_estrategia,
+            self
+        )
+
+        self.label_estrategia.setStyleSheet(
+            "font-weight: bold;"
+        )
+        
+        # ==================================================
         # ESTADO VISUAL DE LOS PICKERS
         # ==================================================
 
@@ -303,24 +366,6 @@ class Ventana(QWidget):
                 self.estado_pickers[picker.id] = "Libre"
 
             actual_picker = actual_picker.nextNode
-
-
-    # def color_zona(self, zona):
-
-    #     colores = [
-    #         QColor(180, 120, 220),
-    #         QColor(230, 190, 80),
-    #         QColor(80, 180, 200),
-    #         QColor(220, 120, 120),
-    #         QColor(120, 200, 120)
-    #     ]
-
-    #     if zona is None:
-    #         return QColor("black")
-
-    #     return colores[
-    #         (zona - 1) % len(colores)
-    #     ]
     
     def color_zona(self, zona):
 
@@ -492,6 +537,49 @@ class Ventana(QWidget):
         #Avanzo solamente un tick
         self.avanzar_simulacion()
 
+    def acelerar_simulacion(self):
+
+        #Si ya estamos al maximo, no hago nada
+        if self.intervalo_actual == 0:
+            return
+
+        #Reduzco el intervalo a la mitad
+        self.intervalo_actual = (
+            self.intervalo_actual // 2
+        )
+
+        #Aplico el nuevo intervalo al timer
+        self.timer.setInterval(
+            self.intervalo_actual
+        )
+
+        #Actualizo el texto mostrado
+        self.label_velocidad.setText(
+            f"Intervalo: {self.intervalo_actual} ms"
+        )
+
+        #Si llego a cero, deshabilito el boton
+        self.boton_acelerar.setEnabled(
+            self.intervalo_actual > 0
+        )
+
+
+    def restablecer_velocidad(self):
+
+        #Vuelvo al intervalo original
+        self.intervalo_actual = 300
+
+        self.timer.setInterval(
+            self.intervalo_actual
+        )
+
+        self.label_velocidad.setText(
+            "Intervalo: 300 ms"
+        )
+
+        #Vuelvo a habilitar el boton x2
+        self.boton_acelerar.setEnabled(True)
+
     def calcular_escala(self):
 
         #Al ancho de la ventana le resto el espacio
@@ -513,18 +601,58 @@ class Ventana(QWidget):
 
     def resizeEvent(self, event):
 
-        #Coloco el panel siempre contra el lado derecho
+        #Calculo la posicion del panel derecho
         x_panel = (
             self.width()
             - self.ancho_panel
             - self.margen_derecho
         )
 
+        # ==================================================
+        # ESTRATEGIA
+        # ==================================================
+
+        self.label_estrategia.setGeometry(
+            x_panel,
+            8,
+            self.ancho_panel,
+            26
+        )
+
+        # ==================================================
+        # VELOCIDAD
+        # ==================================================
+
+        self.label_velocidad.setGeometry(
+            x_panel,
+            40,
+            160,
+            28
+        )
+
+        self.boton_acelerar.setGeometry(
+            x_panel + 170,
+            40,
+            75,
+            28
+        )
+
+        self.boton_velocidad_normal.setGeometry(
+            x_panel + 255,
+            40,
+            75,
+            28
+        )
+
+        # ==================================================
+        # PANEL DE EVENTOS
+        # ==================================================
+
         self.panel_eventos.setGeometry(
             x_panel,
-            60,
+            80,
             self.ancho_panel,
-            self.height() - 100
+            self.height() - 120
         )
 
         super().resizeEvent(event)
@@ -1063,6 +1191,8 @@ estrategia = dialogo.estrategia()
 
 #Por defecto no tenemos zonas espectrales
 zonas_espectrales = None
+K_ZONAS = None
+METRICA = None
 
 
 # ==================================================
@@ -1142,7 +1272,10 @@ simulation = Simulation(
 ventana = Ventana(
     warehouse,
     simulation,
-    zonas_espectrales
+    zonas_espectrales,
+    estrategia=estrategia,
+    k_zonas=K_ZONAS,
+    metrica=METRICA
 )
 
 ventana.showMaximized()
