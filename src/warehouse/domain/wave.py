@@ -63,154 +63,110 @@ class Wave:
         self.assignment_count: int = 0
         self.planned_shares: list | None = None
 
-    def why_not(self, order: Order) -> str|None:
-        """
+    def why_not(self, order: Order) -> str | None:
+        """Determina si cabe un pedido COMPLETO todavía no asignado."""
         if order.state != "PENDIENTE":
-            return f"El pedido {order.id} está {order.state}, solo se pueden añadir pedidos en PENDIENTE a una nueva wave."
+            return f"El pedido {order.id} está {order.state}; no puede agregarse completo de nuevo."
         if self.order_count >= self.config.max_orders:
-            return f"La wave {self.id} esta llena (max_orders {self.config.max_orders})."
-"""
+            return f"La wave {self.id} ya alcanzó max_orders={self.config.max_orders}."
+
         new_products = 0
-        line = order.lines.head
-        while line is not None:
-            if line.value is None:
-                line = line.nextNode
+        for line in order.lines:
+            if line is None:
                 continue
-            if search(self.line_index, line.value.product.id) is None:
+            if line.resto != line.qty:
+                return f"El pedido {order.id} ya se asignó parcialmente."
+            if search(self.line_index, line.product.id) is None:
                 new_products += 1
-            available = line.value.product.available
-            #if available is not None and line.value.qty > available:
-            #    return f"El pedido {order.id} pide {line.value.qty} {line.value.product.id}, pero solo quedan {available} sin reservar."
-            line = line.nextNode
-
+            if line.product.available is not None and line.qty > line.product.available:
+                return (
+                    f"No queda stock suficiente de {line.product.id}: "
+                    f"{line.qty} solicitadas, {line.product.available} disponibles."
+                )
         if self.product_count + new_products > self.config.max_products:
-            return f"El pedido {order.id} llevaría a la wave {self.id} a {self.product_count + new_products} productos distintos (max_products {self.config.max_products})."
-
+            return f"La wave {self.id} superaría max_products={self.config.max_products}."
         return None
 
     def fits(self, order: Order) -> bool:
         return self.why_not(order) is None
 
+    def _take(self, product: Product, qty: int) -> None:
+        """Único punto para contabilizar y reservar unidades de una wave."""
+        if qty <= 0:
+            return
+        if product.available is not None and qty > product.available:
+            raise ValueError(
+                f"Stock insuficiente de {product.id}: {qty} solicitadas, "
+                f"{product.available} disponibles."
+            )
+        product_line = search(self.line_index, product.id)
+        if product_line is None:
+            if self.product_count >= self.config.max_products:
+                raise ValueError(f"La wave {self.id} alcanzó max_products={self.config.max_products}.")
+            product_line = WaveLine(product, 0)
+            add(self.lines, product_line)
+            insert(self.line_index, product_line, product.id)
+            self.product_count += 1
+        product_line.qty += qty
+        self.total_units += qty
+        self.total_weight += product.weight * qty
+        product.reserve(qty)
+
     def add_order(self, order: Order) -> None:
-        """Asigna un pedido `Order` a la wave, y deja las
-        unidades correspondientes al pedido reservadas."""
+        """Agrega un pedido completo; reserva y marca sus cantidades asignadas."""
         reason = self.why_not(order)
         if reason is not None:
             raise ValueError(reason)
-
-        line = order.lines.head
-        while line is not None:           
-            if line.value is None:
-                line = line.nextNode
-                continue    
-
-            pid = line.value.product.id
-            product_line = search(self.line_index, pid)
-            if product_line is not None:
-                product_line.qty += line.value.qty
-            else:    
-                hasta = line.value.resto
-                if hasta == 0:
-                    line = line.nextNode
-                    continue
-                else:                
-                    wave_line = WaveLine(line.value.product, line.value.qty)
-                    add(self.lines, wave_line)
-                    insert(self.line_index, wave_line, pid)                    
-                    self.product_count += 1
-            self.total_units += line.value.qty
-            self.total_weight += line.value.weight
-            line.value.product.reserve(line.value.qty)
-
-            line = line.nextNode
-
+        for line in order.lines:
+            if line is not None:
+                self._take(line.product, line.qty)
+                line.usado += line.qty
+        order.peso_restante = 0.0
         add(self.orders, order)
         self.order_count += 1
-        if order.priority > self.top_priority:
-            self.top_priority = order.priority
+        self.top_priority = max(self.top_priority, order.priority)
         order.assign_to(self)
-        
 
-    def add_partial_order(self, order: Order, capacity: float) -> None:
-            reason = self.why_not(order)            
-            if reason is not None:
-                raise ValueError(reason)
-    
-            line = order.lines.head
-            while line is not None:
-                if line.value is None:
-                    line = line.nextNode
-                    continue
-                
-                pid = line.value.product.id
-                product_line = search(self.line_index, pid)
+    def add_partial_order(self, order: Order, capacity: float) -> int:
+        """Reparte unidades pendientes sin superar capacidad, stock ni max_products.
 
-                if product_line is not None:
-                    product_line.qty += line.value.qty                    
-                else:
-                    if line.value.weight <= capacity:
-                        if line.value.usado == 0:                            
-                            capacity -= line.value.weight
-                            wave_line = WaveLine(line.value.product, line.value.qty)
-                            add(self.lines, wave_line)
-                            insert(self.line_index, wave_line, pid)                           
-                            order.peso_restante -= line.value.weight    
-                            line.value.usado = line.value.qty
-                            self.product_count += 1
-                            self.total_units += line.value.qty
-                            self.total_weight += line.value.weight                                             
-                        else:                            
-                            contador=0
-                            carga=0
-                            hasta = line.value.resto 
-                            for i in range(hasta):
-                                if carga + line.value.product.weight < capacity:
-                                    carga +=line.value.product.weight
-                                    contador +=1
-                                    capacity -= line.value.product.weight
-                                else:
-                                    break
-                            if contador != 0:
-                                line.value.usado += contador
-                                wave_line = WaveLine(line.value.product, contador)
-                                add(self.lines, wave_line)
-                                insert(self.line_index, wave_line, pid)                           
-                                order.peso_restante -= contador * line.value.product.weight    
-                                self.product_count += 1
-                                self.total_units += contador
-                                self.total_weight += contador * line.value.product.weight 
-                             
+        Devuelve la cantidad de unidades agregadas; 0 significa que no hubo avance.
+        Mantiene ``OrderLine.usado`` y ``Order.peso_restante`` sincronizados.
+        """
+        if self.order_count >= self.config.max_orders or capacity <= 0:
+            return 0
+        if order.state not in ("PENDIENTE", "EN_WAVE"):
+            return 0
+        if any(existing is order for existing in self.orders):
+            return 0
 
-                    else:                        
-                        contador=0
-                        carga=0
-                        hasta = line.value.resto
-                        for i in range(hasta):
-                            if carga + line.value.product.weight < capacity:
-                                carga +=line.value.product.weight
-                                contador +=1
-                                capacity -= line.value.product.weight
-                            else:
-                                break
-                        if contador != 0:
-                            line.value.usado += contador
-                            wave_line = WaveLine(line.value.product, contador)
-                            add(self.lines, wave_line)
-                            insert(self.line_index, wave_line, pid)                            
-                            order.peso_restante -= contador * line.value.product.weight 
-                            self.product_count += 1
-                            self.total_units += contador
-                            self.total_weight += contador * line.value.product.weight 
-                                                                  
-            
-                line = line.nextNode 
+        added = 0
+        for line in order.lines:
+            if line is None or line.resto <= 0:
+                continue
+            product = line.product
+            if search(self.line_index, product.id) is None and self.product_count >= self.config.max_products:
+                continue
+            weight = product.weight
+            # EPS permite usar exactamente la capacidad con pesos decimales.
+            units_by_weight = int((capacity + 1e-9) / weight)
+            qty = min(line.resto, units_by_weight)
+            if product.available is not None:
+                qty = min(qty, product.available)
+            if qty <= 0:
+                continue
+            self._take(product, qty)
+            line.usado += qty
+            order.peso_restante = max(0.0, order.peso_restante - qty * weight)
+            capacity -= qty * weight
+            added += qty
+
+        if added > 0:
             add(self.orders, order)
             self.order_count += 1
-            if order.priority > self.top_priority:
-                self.top_priority = order.priority
-            if line is None:
-                order.assign_to(self)
-            
+            self.top_priority = max(self.top_priority, order.priority)
+            order.assign_to(self)
+        return added
 
     def add_product_line(self, product: Product, qty: int, priority: int = 0) -> None:
         """Agrega unidades de un `Product` directamente a la wave (sin acoplarla

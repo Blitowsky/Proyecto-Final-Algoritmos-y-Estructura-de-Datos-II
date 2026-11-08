@@ -44,7 +44,7 @@ def ordenarPedidos(ordenes):
             nodeLine=nodeOrder.value.lines.head
 
     pedidosPonderados.sort(key=lambda x: x[1], reverse=True)
-
+   
     return pedidosPonderados
 
 def ponderar(prioridad, val):

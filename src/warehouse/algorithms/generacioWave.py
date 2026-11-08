@@ -1,68 +1,103 @@
 from warehouse.algorithms.oredenarPedidos import ordenarPedidos
 from warehouse.domain.wave import Wave
+from warehouse.structures.linkedlist import LinkedList, add
 import math
 
-def generacionWaves(ordenes, pickers, config):
-    pedidos = ordenarPedidos(ordenes)
+def generacionWaves(warehouse):
+    pedidos = ordenarPedidos(warehouse.orders)
     picker = []
-    currentNode = pickers.head
+    currentNode = warehouse.pickers.head
     while currentNode is not None:
         picker.append(currentNode.value)
         currentNode = currentNode.nextNode
-    lista = generadorDeWaves(pedidos, config, picker)
-    return lista
+    lista = generadorDeWaves(pedidos, warehouse.wave_config, picker)
+
+    wavesWareHouse = LinkedList()
+    for wave in lista:
+        for w in wave:
+            add(wavesWareHouse,w)
+    warehouse.waves=wavesWareHouse
+
+    
 
 def generadorDeWaves(pedidos, config, pickers):
-    indexPed = 0     
-    waves_por_picker = [[] for _ in range(len(pickers))]
-    while pedidos is not None:
-        for i in range(len(pickers)):             
-            capasidad = pickers[i].capacity
-            muestra = pedidos[0]
-            if muestra[0].peso_restante < 0.1:
-                pedidos.pop(0)
-                continue
-            if muestra[0].peso_restante > capasidad:                    
-                wave = Wave(str(indexPed), config)
-                indexPed += 1                
-                wave.add_partial_order(muestra[0], capasidad)   
-                waves_por_picker[i].append(wave)   
-                if muestra[0].state =="EN_WAVE" and muestra[0].peso_restante < 0.01:
-                    pedidos.pop(0)                             
-            else:
-                if muestra[0].total_weight == muestra[0].peso_restante:
-                    muestra = pedidos.pop(0)               
-                    pedCercanos = listaPedMinimo(pedidos, muestra[2])
-                    wave = Wave(str(indexPed), config)
-                    indexPed += 1
-                    wave.add_order(muestra[0])
-                    capasidad -= wave.total_weight  
-                else:  
-                    pedidosFiltrados = [p for p in pedidos if p[0].id != muestra[0].id]
-                    pedCercanos = listaPedMinimo(pedidosFiltrados, muestra[2])
-                    wave = Wave(str(indexPed), config)
-                    indexPed += 1                  
-                    wave.add_partial_order(muestra[0], capasidad)
-                    capasidad -= wave.total_weight
-                for ped, val in pedCercanos:
-                    if wave.order_count< config.max_orders:
-                        if wave.fits(ped) and capasidad - ped.total_weight >= 0 :
-                            wave.add_order(ped) 
-                            capasidad -= ped.total_weight                       
-                            pedidos = [t for t in pedidos if t[0] != ped]
-                        else:                                                      
-                            wave.add_partial_order(ped, capasidad)                            
-                            if ped =="EN_WAVE":
-                                pedidos = [t for t in pedidos if t[0] != ped]
-                            break
-                    else:
-                        break
+    """Agrupa pedidos por cercanía con reparto de unidades y reserva real.
 
-                waves_por_picker[i].append(wave)
-            if not pedidos:
+    ``pedidos`` contiene tuplas (Order, ponderación, centroide). Se consume
+    una copia; las cantidades ya asignadas están en ``OrderLine.usado``.
+    """
+    pendientes = list(pedidos)
+    waves_por_picker = [[] for _ in pickers]
+    if pendientes and not pickers:
+        raise ValueError("No hay pickers para preparar los pedidos.")
+    index_wave = 0
+    EPS = 1e-9
+
+    def puede_tomar(order, capacity):
+        return any(
+            line is not None and line.resto > 0
+            and line.product.weight <= capacity + EPS
+            and (line.product.available is None or line.product.available > 0)
+            for line in order.lines
+        )
+
+    while pendientes:
+        hubo_avance = False
+        for i, picker in enumerate(pickers):
+            if not pendientes:
                 break
-        if not pedidos:
-            break
+            # Puede haber pedidos cuyo producto pese más que la capacidad del
+            # picker actual; buscar uno viable sin descartarlos.
+            muestra = next((t for t in pendientes if puede_tomar(t[0], picker.capacity)), None)
+            if muestra is None:
+                continue
+
+            wave = Wave(str(index_wave), config)
+            capacidad = picker.capacity
+
+            def agregar_pedido(pedido):
+                nonlocal capacidad
+                antes = wave.total_weight
+                if (pedido.state == "PENDIENTE"
+                    and pedido.peso_restante <= capacidad + EPS
+                    and wave.fits(pedido)):
+                    wave.add_order(pedido)
+                else:
+                    wave.add_partial_order(pedido, capacidad)
+                capacidad = max(0.0, capacidad - (wave.total_weight - antes))
+                # Una orden se elimina de pendientes solo cuando TODAS sus
+                # líneas se han asignado (no por pasar a EN_WAVE).
+                if all(l is None or l.resto == 0 for l in pedido.lines):
+                    pendientes[:] = [t for t in pendientes if t[0] is not pedido]
+
+            agregar_pedido(muestra[0])
+            # Buscar cercanos al pedido inicial, sin incluirlo de nuevo.
+            cercanos = listaPedMinimo(
+                [t for t in pendientes if t[0] is not muestra[0]], muestra[2]
+            )
+            for pedido, _ in cercanos:
+                if wave.order_count >= config.max_orders or capacidad <= EPS:
+                    break
+                if puede_tomar(pedido, capacidad):
+                    agregar_pedido(pedido)
+
+            if wave.total_units > 0:
+                waves_por_picker[i].append(wave)
+                index_wave += 1
+                hubo_avance = True
+
+        if not hubo_avance:
+            faltantes = [
+                f"{t[0].id}: " + ", ".join(
+                    f"{l.product.id} x{l.resto}" for l in t[0].lines if l and l.resto > 0
+                ) for t in pendientes
+            ]
+            raise ValueError(
+                "No se pueden asignar las unidades restantes a ningún picker. "
+                "Verificá el peso unitario, stock y capacidad. Pedidos: "
+                + "; ".join(faltantes)
+            )
+
     return waves_por_picker
 
 def listaPedMinimo(pedidos, muestra):
@@ -77,17 +112,17 @@ def listaDeWaveParaTodasLasOrdenes(pedidos, config, pickers):
     waves_por_picker = [[] for _ in range(len(pickers))]
     while pedidos is not None:
         for i in range(len(pickers)):  
-            capasidad = pickers[i].capacity
+            capacidad = pickers[i].capacity
             muestra = pedidos.pop(0)
             pedCercanos = listaPedMinimo(pedidos, muestra[2])
             wave = Wave(str(indexPed), config)
             indexPed += 1
             wave.add_order(muestra[0])
-            capasidad -= wave.total_weight
+            capacidad -= wave.total_weight
             for ped, val in pedCercanos:
-                if wave.fits(ped) and capasidad - ped.total_weight >= 0 :
+                if wave.fits(ped) and capacidad - ped.total_weight >= 0 :
                     wave.add_order(ped)
-                    capasidad -= ped.total_weight                    
+                    capacidad -= ped.total_weight                    
                     pedidos = [t for t in pedidos if t[0] != ped]                         
             waves_por_picker[i].append(wave)
             if not pedidos:
@@ -100,15 +135,15 @@ def unaWavePorPicker(pedidos, config, pickers):
     indexPed = 0
     listaWave = []
     for i in range(len(pickers)):
-        capasidad = pickers[i].capacity
+        capacidad = pickers[i].capacity
         muestra = pedidos.pop(0)
         pedCercanos = listaPedMinimo(pedidos, muestra[2])
         wave = Wave(str(indexPed), config)
         indexPed += 1
         wave.add_order(muestra[0])
-        capasidad -= wave.total_weight
+        capacidad -= wave.total_weight
         for ped, val in pedCercanos:
-            if wave.fits(ped) and capasidad + ped.total_weight < pickers[i].capacity :
+            if wave.fits(ped) and capacidad + ped.total_weight < pickers[i].capacity :
                 wave.add_order(ped)                
                 pedidos = [t for t in pedidos if t[0] != ped]                      
         listaWave.append(wave)

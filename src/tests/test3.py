@@ -16,8 +16,13 @@ from warehouse.persistence.save_load import load, save
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 
 config = load_config(SCENARIO)
-warehouse, noValido = build_warehouse(config)
+warehouse = build_warehouse(config)
 
+for rechazo in warehouse.rejected_orders:
+    print(
+        f"Pedido {rechazo.order_id} rechazado: "
+        f"{rechazo.reason}"
+    )
 
 
 def picker_start_cells(config, floor):
@@ -128,13 +133,9 @@ print()
 
 
 
-waves= generacionWaves(warehouse.orders, warehouse.pickers, warehouse.wave_config)
+waves= generacionWaves( warehouse)
 
-wavesWareHouse = LinkedList()
-for wave in waves:
-    for w in wave:
-        add(wavesWareHouse,w)
-warehouse.waves=wavesWareHouse
+
 
 """
 for wave in waves:
@@ -145,6 +146,7 @@ for wave in waves:
         currentLine = currentLine.nextNode
 
 """
+
 
 
     

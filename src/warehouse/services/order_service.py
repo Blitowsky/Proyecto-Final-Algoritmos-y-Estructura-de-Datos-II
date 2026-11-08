@@ -2,9 +2,10 @@ from warehouse.structures.linkedlist import LinkedList, add
 from warehouse.structures.dictionary import CloseDictionary, Dictionary, search, insert
 
 from warehouse.domain.order import Order
+from warehouse.services.order_validation import RejectedOrder
 from warehouse.persistence.scenario_loader import require_keys, require_id
 
-def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictionary]:
+def add_orders(config: dict, products: Dictionary, rejected: list | None = None) -> tuple[LinkedList, Dictionary]:
     """Retorna lista y hash table de pedidos (`Order`) del JSON
         
     Parámetros
@@ -24,12 +25,13 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
     """
     order_list = config.get("pedidos", [])
     orders = LinkedList()
-    
+
 #Mio anterir
     """
     by_id = Dictionary(2 * len(order_list) + 1)
     noValido=[]
     """
+    
 
     by_id = CloseDictionary(2 * len(order_list) + 1)
 
@@ -49,24 +51,36 @@ def add_orders(config: dict, products: Dictionary) -> tuple[LinkedList, Dictiona
             raise ValueError(f"{label} tiene estado {estado}, solo pedidos en PENDIENTE pueden ser cargados.")
 
         order = Order(oid, o["prioridad"])
+        invalid_reason = None
         for item in o["items"]:
             require_keys(item, ("producto_id", "cantidad"), label + " tiene un pedido que")
             pid = item["producto_id"]
             product = search(products, pid)
             if product is None:
                 raise ValueError(f"{label} pide un producto desconocido: {pid}")
-            if product.reserved + item["cantidad"] <= product.stock:
-                product.reserved += item["cantidad"]
-                order.add_line(product, item["cantidad"])
-            else:
-                noValido.append(product.id)
-                print(f"No se puede agregar al pedido {oid} el producto {pid} porque necesita la cantidad de: {product.reserved + item["cantidad"]} y la cantidad actual es: {product.stock}")
             
+            qty = item["cantidad"]
+            # Un pedido imposible por sí solo se rechaza sin detener la carga.
+            # No se hace ninguna reserva de stock en este paso.
+            if (isinstance(qty, int) and not isinstance(qty, bool)
+                    and product.stock is not None and qty > product.stock):
+                invalid_reason = (
+                    f"Stock insuficiente de {pid}: solicita {qty} unidades "
+                    f"y existen {product.stock}."
+                )
+                break
+            order.add_line(product, qty)
+
+        if invalid_reason is not None:
+            if rejected is None:
+                raise ValueError(f"El pedido {oid}: {invalid_reason}")
+            rejected.append(RejectedOrder(oid, invalid_reason))
+            continue
 
         add(orders, order)
         insert(by_id, order, oid)
 
-    return orders, by_id
+    return orders, by_id 
     ### mio anteriro
     """
     return orders, by_id, noValido

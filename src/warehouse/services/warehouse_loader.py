@@ -15,6 +15,7 @@ from warehouse.domain.direction import MOVES, step
 from warehouse.services.hall_graph_builder import build_hall_graph
 from warehouse.services.rack_cell_builder import build_rack_cells
 from warehouse.services.order_service import add_orders
+from warehouse.services.order_validation import validate_orders_stock
 from warehouse.services.product_loader import load_products
 
 from warehouse.persistence.scenario_loader import (
@@ -63,10 +64,11 @@ def build_warehouse(config: dict) -> WareHouse:
 
     products = load_products(config, floor)
     pickers = load_pickers(config, floor)
-    orders, orders_by_id, noValido = add_orders(config, products)
+    rejected_on_load = []
+    orders, orders_by_id = add_orders(config, products, rejected=rejected_on_load)
     wave_config = add_wave_config(config)
 
-    return WareHouse(
+    warehouse = WareHouse(
         floor,
         graph,
         products,
@@ -74,7 +76,10 @@ def build_warehouse(config: dict) -> WareHouse:
         orders,
         orders_by_id,
         wave_config
-    ), noValido
+    )
+    warehouse.rejected_orders = rejected_on_load
+    validate_orders_stock(warehouse)
+    return warehouse
 
 
 def add_unique(items: LinkedList, by_id: CloseDictionary, item, label: str) -> None:

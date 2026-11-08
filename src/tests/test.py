@@ -74,7 +74,6 @@ print()
 simulation = Simulation(
         warehouse,
         algorithm="bfs",
-        stop_orderer=selector,
         auto_assign=True
     )
 

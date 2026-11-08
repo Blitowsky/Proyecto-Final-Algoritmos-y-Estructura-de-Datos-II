@@ -76,6 +76,7 @@ class WareHouse:
         self.orders_by_id: Dictionary = orders_by_id
         self.wave_config: WaveConfig = wave_config
         self.waves: LinkedList = LinkedList()
+        self.rejected_orders: list = []
 
     def node_xy(self, node_id: int) -> tuple[int, int]:
         return node_id % self.width, node_id // self.width
