@@ -15,3 +15,5 @@ sudo apt install -y \
     libxcb-util1 \
     libgl1 \
     libegl1
+
+sudo apt install python3-venv

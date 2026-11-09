@@ -1,0 +1,17 @@
+scenario,metric,A - Sin estrategia,B - Centroide de pedidos,C - Clustering espectral,B - Centroide de pedidos vs A (%),C - Clustering espectral vs A (%)
+basico,ticks,122,122,81,0.0,-33.60655737704918
+basico,assignments,5,5,4,0.0,-20.0
+basico,planned_distance,163.0,163.0,125.0,0.0,-23.312883435582823
+basico,steps,163,163,125,0.0,-23.312883435582823
+basico,waits,1,1,1,0.0,0.0
+basico,reroutes,0,0,0,,
+basico,side_steps,1,1,1,0.0,0.0
+basico,wall_ms,62.8589,38.077712,112.479261,-39.42351520627947,78.93927669749232
+grande,ticks,1698,1542,497,-9.187279151943462,-70.73027090694936
+grande,assignments,40,11,9,-72.5,-77.5
+grande,planned_distance,6251.0,4779.0,1516.0,-23.548232282834746,-75.74788033914574
+grande,steps,6257,4788,1521,-23.477704970433116,-75.69122582707368
+grande,waits,18,19,8,5.555555555555555,-55.55555555555556
+grande,reroutes,4,6,2,50.0,-50.0
+grande,side_steps,0,2,2,,
+grande,wall_ms,9073.412784,7720.603199,6443.114823,-14.90960035881467,-28.989069753756286

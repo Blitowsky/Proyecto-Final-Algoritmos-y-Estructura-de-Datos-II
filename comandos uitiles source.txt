@@ -1,4 +1,5 @@
 comandos uitiles
+
 source .venv/bin/activate
 PYTHONPATH=src python src/ui/interfaz.py
 
