@@ -5,8 +5,6 @@ Minimiza el recorrido real (respetando pasillos unidireccionales y múltiples
 celdas de acceso por parada) mediante:
 1. Cálculo exacto de distancias dirigidas con `bfs_distances_targeted`.
 2. Construcción inicial por vecino más cercano dirigido.
-3. Refinamiento local (Or-opt de 1 y 2 paradas + intercambios) evaluando el
-   costo exacto de ruta desde la entrada en zona hasta el retorno a despacho.
 """
 
 from warehouse.algorithms.pathfinding import bfs_distances_targeted, find_path
@@ -36,9 +34,7 @@ def order_node_groups_directed(
     stop_cell_lists: list[list[int]],
     return_cells: list[int] | None = None,
 ) -> list[int]:
-    """Retorna la permutación de índices `[0..m-1]` que minimiza la distancia
-    dirigida total `start_node -> stop[p_0] -> ... -> stop[p_{m-1}] -> return_cells`.
-    """
+    
     m = len(stop_cell_lists)
     if m <= 1:
         return list(range(m))
@@ -96,7 +92,6 @@ def order_node_groups_directed(
         total += min(row[r] for r in ret_nodes)
         return total
 
-    # Fase 1: Vecino más cercano dirigido
     unvisited = list(range(m))
     seq: list[int] = []
     curr = start_node
@@ -116,7 +111,6 @@ def order_node_groups_directed(
         seq.append(best_idx)
         curr = best_c
 
-    # Fase 2: Búsqueda local dirigida (Or-opt de longitud 1 y 2 + swap)
     best_cost = route_cost(seq)
     improved = True
     passes = 0
@@ -124,7 +118,6 @@ def order_node_groups_directed(
         improved = False
         passes += 1
 
-        # Or-opt: mover bloque de 1 o 2 paradas a otra posición
         for block_len in (1, 2):
             if m <= block_len:
                 continue
@@ -149,7 +142,6 @@ def order_node_groups_directed(
         if improved:
             continue
 
-        # Intercambios entre pares de paradas
         for i in range(m):
             for j in range(i + 1, m):
                 cand = list(seq)

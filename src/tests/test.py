@@ -16,8 +16,6 @@ import clustering.spectral as cs
 
 SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
 
-config = load_config(SCENARIO)
-warehouse = build_warehouse(config)
 
 def picker_start_cells(config, floor):
     cells = LinkedList()
@@ -39,54 +37,59 @@ def test_grid(floor):
     rows = render_rows(floor, picker_start_cells(config, floor))
     print(render_map(floor, picker_start_cells(config, floor)))
 
-test_grid(warehouse.floor)
-print()
+
+if __name__ == "__main__":
+    config = load_config(SCENARIO)
+    warehouse = build_warehouse(config)
+
+    test_grid(warehouse.floor)
+    print()
 
 
-K_ZONAS = 4
+    K_ZONAS = 4
 
-zonas_espectrales = cs.main(
-    warehouse=warehouse,
-    k_zones=K_ZONAS,
-    metric="t"
-)
-print()
-
-selector = SpectralWaveSelector(
-    warehouse=warehouse,
-    spectral_zones=zonas_espectrales,
-    pickers=warehouse.pickers
-)
-waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
-print()
-
-# selector = ProductCentroidSelector(warehouse, warehouse.orders)
-# waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
-# CON generacion de waves
-# {'ticks': 1366, 'assignments': 11, 'planned_distance': 4739.0, 'steps': 4751, 'waits': 15, 'reroutes': 7, 'side_steps': 0}
-
-# SIN generacion de waves (solo ordenando pedidos)
-# {'ticks': 1930, 'assignments': 12, 'planned_distance': 5416.0, 'steps': 5432, 'waits': 25, 'reroutes': 8, 'side_steps': 2}
-
-# waves, rejected = WaveBuilder(warehouse, selector=None, pickers=warehouse.pickers).build()
-# {'ticks': 1714, 'assignments': 40, 'planned_distance': 6183.0, 'steps': 6191, 'waits': 14, 'reroutes': 4, 'side_steps': 0}
-
-simulation = Simulation(
-        warehouse,
-        algorithm="bfs",
-        auto_assign=True
+    zonas_espectrales = cs.main(
+        warehouse=warehouse,
+        k_zones=K_ZONAS,
+        metric="t"
     )
+    print()
 
-simulation.run()
+    selector = SpectralWaveSelector(
+        warehouse=warehouse,
+        spectral_zones=zonas_espectrales,
+        pickers=warehouse.pickers
+    )
+    waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
+    print()
 
-print(simulation.summary())
-preparados = sum(1 for o in warehouse.orders if o is not None and o.state == "PREPARADO")
-print(f"Pedidos preparados tras entregas: {preparados}/{length(warehouse.orders)}")
-print()
+    # selector = ProductCentroidSelector(warehouse, warehouse.orders)
+    # waves, rejected = WaveBuilder(warehouse, selector=selector, pickers=warehouse.pickers).build()
+    # CON generacion de waves
+    # {'ticks': 1366, 'assignments': 11, 'planned_distance': 4739.0, 'steps': 4751, 'waits': 15, 'reroutes': 7, 'side_steps': 0}
 
-for event in simulation.events:
-    if event.kind != "move":
-        print(event.describe(warehouse))
-print()
+    # SIN generacion de waves (solo ordenando pedidos)
+    # {'ticks': 1930, 'assignments': 12, 'planned_distance': 5416.0, 'steps': 5432, 'waits': 25, 'reroutes': 8, 'side_steps': 2}
 
-print(render_map(warehouse.floor, picker_current_cells(warehouse)))
+    # waves, rejected = WaveBuilder(warehouse, selector=None, pickers=warehouse.pickers).build()
+    # {'ticks': 1714, 'assignments': 40, 'planned_distance': 6183.0, 'steps': 6191, 'waits': 14, 'reroutes': 4, 'side_steps': 0}
+
+    simulation = Simulation(
+            warehouse,
+            algorithm="bfs",
+            auto_assign=True
+        )
+
+    simulation.run()
+
+    print(simulation.summary())
+    preparados = sum(1 for o in warehouse.orders if o is not None and o.state == "PREPARADO")
+    print(f"Pedidos preparados tras entregas: {preparados}/{length(warehouse.orders)}")
+    print()
+
+    for event in simulation.events:
+        if event.kind != "move":
+            print(event.describe(warehouse))
+    print()
+
+    print(render_map(warehouse.floor, picker_current_cells(warehouse)))
