@@ -51,19 +51,39 @@ En Linux:
 ```bash
 source .venv/bin/activate
 ```
+En Windows:
+
+```bash
+source .venv\Scripts\activate.bat
+```
 
 ### 3. Instalar dependencias
 
+En Linux:
+
 ```bash
 pip install -r requirements.txt
+```
+En Windows:
+
+```bash
+python -m pip install -r requirements.txt
 ```
 
 ## Ejecución
 
 Desde la raíz del proyecto:
 
+En Linux:
+
 ```bash
 PYTHONPATH=src python src/ui/interfaz.py
+```
+
+En Windows:
+```bash
+set PYTHONPATH=src
+python src\ui\interfaz.py
 ```
 
 ## Algoritmos utilizados
