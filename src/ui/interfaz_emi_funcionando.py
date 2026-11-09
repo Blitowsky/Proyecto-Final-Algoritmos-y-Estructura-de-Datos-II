@@ -2,17 +2,20 @@ import sys
 import math
 import os
 import inspect
+import time
+from html import escape
+from collections import Counter
 import clustering.spectral as cs
 
 from warehouse.algorithms.wave_generation.spectral_waves import SpectralWaveSelector
-from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
+#from warehouse.algorithms.wave_generation.order_centroids.product_centroids import ProductCentroidSelector
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel, QTextEdit, QDialog,
     QVBoxLayout, QHBoxLayout, QComboBox, QSpinBox, QDialogButtonBox,
-    QFileDialog, QLineEdit, QMessageBox
+    QFileDialog, QLineEdit, QMessageBox, QScrollArea, QTextBrowser
 )
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPixmap
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QThread, pyqtSignal, Qt
 
 from warehouse.services.wave_builder import WaveBuilder
 from warehouse.simulation.simulation import Simulation
@@ -88,6 +91,12 @@ class DialogoEstrategia(QDialog):
         )
         self.botones.accepted.connect(self.accept)
         self.botones.rejected.connect(self.reject)
+
+        # Accion independiente: comparar ambos metodos sin abrir la animacion.
+        self.boton_resultados = self.botones.addButton(
+            "Resultado", QDialogButtonBox.ButtonRole.ActionRole
+        )
+        self.boton_resultados.clicked.connect(self.abrir_resultados)
         layout.addWidget(self.botones)
 
         self.combo_origen.currentIndexChanged.connect(self.actualizar_origen)
@@ -126,6 +135,17 @@ class DialogoEstrategia(QDialog):
         if archivo:
             self.ruta_archivo.setText(archivo)
 
+    def abrir_resultados(self):
+        """Usa el mismo JSON seleccionado cuando la fuente es 'nuevo'."""
+        ruta = self.archivo()
+        if self.origen() != "nuevo" or not ruta.lower().endswith(".json"):
+            ruta = os.path.abspath("src/data/escenario_grande.json")
+        dialogo = DialogoResultados(ruta, self.k_zonas(), self.metrica(), self)
+        if dialogo.exec() == QDialog.DialogCode.Accepted:
+            self.opciones_resultados = dialogo.opciones()
+            # Codigo 2: salir del dialogo inicial en modo comparacion.
+            self.done(2)
+
     def accept(self):
         ruta = self.archivo()
         if not ruta or not os.path.isfile(ruta):
@@ -150,6 +170,89 @@ class DialogoEstrategia(QDialog):
 
     def metrica(self):
         return self.combo_metrica.currentData()
+
+
+# ==================================================
+# PARAMETROS PARA COMPARAR LOS DOS METODOS
+# ==================================================
+
+class DialogoResultados(QDialog):
+    """Pide el mismo JSON, el numero K y la metrica para la comparacion."""
+
+    def __init__(self, ruta_json, k=4, metrica="t", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Comparar resultados: centroide vs espectral")
+        self.setMinimumWidth(570)
+        layout = QVBoxLayout(self)
+        descripcion = QLabel(
+            "Se construira el warehouse dos veces desde este JSON, "
+            "una por estrategia. Ambas simulaciones se ejecutaran sin mostrar la cuadricula."
+        )
+        descripcion.setWordWrap(True)
+        layout.addWidget(descripcion)
+
+        layout.addWidget(QLabel("Escenario JSON (el mismo para ambos algoritmos):"))
+        fila = QHBoxLayout()
+        self.ruta_archivo = QLineEdit(ruta_json)
+        fila.addWidget(self.ruta_archivo)
+        boton = QPushButton("Examinar...")
+        boton.clicked.connect(self.elegir_archivo)
+        fila.addWidget(boton)
+        layout.addLayout(fila)
+
+        layout.addWidget(QLabel("Cantidad de zonas K del clustering espectral:"))
+        self.spin_k = QSpinBox()
+        self.spin_k.setRange(1, 1000)
+        self.spin_k.setValue(max(1, int(k)))
+        layout.addWidget(self.spin_k)
+
+        layout.addWidget(QLabel("Metrica de distancias para clustering:"))
+        self.combo_metrica = QComboBox()
+        self.combo_metrica.addItem("Topologica", "t")
+        self.combo_metrica.addItem("Euclidiana", "e")
+        self.combo_metrica.setCurrentIndex(1 if metrica == "e" else 0)
+        layout.addWidget(self.combo_metrica)
+
+        nota = QLabel(
+            "K solo se aplica al clustering espectral. Si hay menos productos "
+            "pendientes que K, se usara la cantidad de productos disponibles."
+        )
+        nota.setWordWrap(True)
+        layout.addWidget(nota)
+
+        self.botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        self.botones.button(QDialogButtonBox.StandardButton.Ok).setText("Comparar")
+        self.botones.accepted.connect(self.accept)
+        self.botones.rejected.connect(self.reject)
+        layout.addWidget(self.botones)
+
+    def elegir_archivo(self):
+        ruta, _ = QFileDialog.getOpenFileName(
+            self, "Seleccionar escenario JSON",
+            self.ruta_archivo.text() or os.getcwd(),
+            "Archivos JSON (*.json)"
+        )
+        if ruta:
+            self.ruta_archivo.setText(ruta)
+
+    def accept(self):
+        ruta = self.ruta_archivo.text().strip()
+        if not ruta or not os.path.isfile(os.path.expanduser(ruta)) or not ruta.lower().endswith(".json"):
+            QMessageBox.warning(
+                self, "Escenario invalido", "Selecciona un archivo JSON existente."
+            )
+            return
+        super().accept()
+
+    def opciones(self):
+        return {
+            "json": os.path.abspath(os.path.expanduser(self.ruta_archivo.text().strip())),
+            "k": self.spin_k.value(),
+            "metrica": self.combo_metrica.currentData(),
+        }
 
 
 # ==================================================
@@ -1003,15 +1106,16 @@ class Ventana(QWidget):
         # ==================================================
         
         #Adapto el tamaño de los nodos a la escala
-        if self.escala < 15:
-
-            painter.setBrush(QBrush(QColor(150, 150, 150)))
+        if self.escala < 20:
             radio_nodo = 1
-
         else:
+            radio_nodo = 2
 
-            painter.setBrush(QBrush(QColor("black")))
-            radio_nodo = 3
+        #Evito que el contorno aumente el tamaño del nodo
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        #Color de relleno del nodo
+        painter.setBrush(QBrush(QColor(90, 90, 90)))
 
         #Recorro nuevamente toda la cuadricula
         for y in range(self.warehouse.height):
@@ -1218,6 +1322,422 @@ def generar_waves_centroide(warehouse):
             warehouse.orders, warehouse.pickers, warehouse.wave_config
         )
     registrar_waves_generadas(warehouse, resultado)
+    return resultado
+
+
+# ==================================================
+# RESULTADOS COMPARABLES SIN ANIMACION
+# ==================================================
+
+def medir_resultado_desde_json(ruta_json, metodo, k_zonas, metrica, progreso=None, interrumpido=None):
+    """Construye un warehouse independiente, crea waves y ejecuta la simulacion.
+
+    Devuelve exclusivamente valores simples para poder presentarlos desde la UI.
+    Se reconstruye desde el JSON en cada llamada: no reutiliza pedidos, reservas
+    ni pickers mutados por la estrategia anterior.
+    """
+    if metodo not in ("centroide", "clustering"):
+        raise ValueError(f"Estrategia desconocida: {metodo}")
+    if interrumpido and interrumpido():
+        raise InterruptedError("Comparacion cancelada")
+
+    t_total = time.perf_counter()
+    t = time.perf_counter()
+    config = load_config(ruta_json)
+    warehouse = build_warehouse(config)
+    tiempo_carga = time.perf_counter() - t
+
+    pedidos = [o for o in warehouse.orders if o is not None]
+    pickers = [p for p in warehouse.pickers if p is not None]
+    unidades_pedidas = sum(o.total_units for o in pedidos)
+    peso_pedido = sum(o.total_weight for o in pedidos)
+    rechazos = [
+        f"{getattr(r, 'order_id', '?')}: {getattr(r, 'reason', str(r))}"
+        for r in getattr(warehouse, "rejected_orders", [])
+    ]
+
+    if interrumpido and interrumpido():
+        raise InterruptedError("Comparacion cancelada")
+
+    t = time.perf_counter()
+    zonificacion = None
+    k_efectivo = None
+    zones_sizes = []
+    por_picker = Counter()
+    rechazos_waves = []
+
+    if metodo == "centroide":
+        if progreso:
+            progreso("Generando waves por centroide...")
+        waves_por_picker = generar_waves_centroide(warehouse)
+        # En el metodo centroide la salida es una lista de waves por picker.
+        # No confundir indice de picker con orden de las waves creadas.
+        if isinstance(waves_por_picker, (list, tuple)):
+            for i, grupo in enumerate(waves_por_picker):
+                if i >= len(pickers):
+                    break
+                if hasattr(grupo, "total_units"):
+                    cantidad = 1
+                elif hasattr(grupo, "__iter__"):
+                    cantidad = sum(1 for w in grupo if w is not None)
+                else:
+                    cantidad = 0
+                por_picker[str(pickers[i].id)] += cantidad
+    else:
+        if progreso:
+            progreso("Calculando el clustering espectral...")
+        productos = cs.extract_pending_products(warehouse)
+        if not productos:
+            raise ValueError("No hay productos pendientes para clusterizar.")
+        k_efectivo = min(k_zonas, len(productos))
+        zonificacion = cs.main(
+            warehouse=warehouse, k_zones=k_efectivo, metric=metrica
+        )
+        zones_sizes = [len(z) for z in zonificacion]
+        selector = SpectralWaveSelector(
+            warehouse=warehouse,
+            spectral_zones=zonificacion,
+            pickers=warehouse.pickers,
+            verbose=False,
+        )
+        _, rejected = WaveBuilder(
+            warehouse, selector=selector, pickers=warehouse.pickers
+        ).build()
+        rechazos_waves = [
+            f"{r.order.id}: {r.reason}" for r in rejected if r is not None
+        ]
+        for wave in warehouse.waves:
+            if wave is None:
+                continue
+            # Las waves del espectral guardan el picker en planned_shares.
+            for picker, _shares in (wave.planned_shares or []):
+                por_picker[str(picker.id)] += 1
+
+    tiempo_waves = time.perf_counter() - t
+    waves = [w for w in warehouse.waves if w is not None]
+    unidades_waves = sum(w.total_units for w in waves)
+    peso_waves = sum(w.total_weight for w in waves)
+    detalles_waves = [
+        (str(w.id), w.total_units, round(w.total_weight, 2), w.product_count)
+        for w in waves
+    ]
+
+    # Simulacion completa SIN ventana ni Timer. Conserva las mismas reglas
+    # de recorrido bfs y auto_asignacion usadas en el modo grafico.
+    if progreso:
+        progreso(f"Ejecutando {metodo} sin animacion (0 ticks)...")
+    simulacion = Simulation(warehouse, algorithm="bfs", auto_assign=True)
+    t = time.perf_counter()
+    while not simulacion.finished:
+        if interrumpido and interrumpido():
+            raise InterruptedError("Comparacion cancelada")
+        if simulacion.tick >= simulacion.max_ticks:
+            raise RuntimeError(
+                f"La simulacion de {metodo} no termino despues de "
+                f"{simulacion.max_ticks} ticks."
+            )
+        simulacion.step()
+        if progreso and simulacion.tick % 250 == 0:
+            progreso(f"Ejecutando {metodo} sin animacion ({simulacion.tick} ticks)...")
+    tiempo_sim = time.perf_counter() - t
+    resumen = simulacion.summary()
+
+    return {
+        "metodo": metodo,
+        "k_pedido": k_zonas if metodo == "clustering" else None,
+        "k_efectivo": k_efectivo,
+        "zonas": len(zonificacion) if zonificacion is not None else None,
+        "zonas_productos": zones_sizes,
+        "metrica": metrica if metodo == "clustering" else None,
+        "pedidos": len(pedidos),
+        "pickers": len(pickers),
+        "rechazados": rechazos,
+        "rechazos_waves": rechazos_waves,
+        "waves": len(waves),
+        "unidades_pedidas": unidades_pedidas,
+        "peso_pedido": peso_pedido,
+        "unidades_waves": unidades_waves,
+        "peso_waves": peso_waves,
+        "cobertura": (100.0 * unidades_waves / unidades_pedidas)
+                     if unidades_pedidas else 100.0,
+        "promedio_peso_wave": (peso_waves / len(waves)) if waves else 0.0,
+        "por_picker": dict(por_picker),
+        "detalles_waves": detalles_waves,
+        "tiempo_carga": tiempo_carga,
+        "tiempo_waves": tiempo_waves,
+        "tiempo_sim": tiempo_sim,
+        "tiempo_total": time.perf_counter() - t_total,
+        "finalizo": simulacion.finished,
+        "ticks": resumen["ticks"],
+        "asignaciones": resumen["assignments"],
+        "distancia": resumen["planned_distance"],
+        "pasos": resumen["steps"],
+        "esperas": resumen["waits"],
+        "reenrutamientos": resumen["reroutes"],
+        "pasos_laterales": resumen["side_steps"],
+    }
+
+
+class TrabajadorResultados(QThread):
+    """Ejecuta el calculo en un hilo, sin bloquear el hilo principal de PyQt."""
+    progreso = pyqtSignal(str)
+    resultado = pyqtSignal(str, object)
+    error = pyqtSignal(str, str)
+
+    def __init__(self, opciones, parent=None):
+        super().__init__(parent)
+        self.opciones = dict(opciones)
+
+    def run(self):
+        for metodo in ("centroide", "clustering"):
+            if self.isInterruptionRequested():
+                break
+            self.progreso.emit(f"Procesando {metodo}...")
+            try:
+                datos = medir_resultado_desde_json(
+                    self.opciones["json"], metodo,
+                    self.opciones["k"], self.opciones["metrica"],
+                    progreso=self.progreso.emit,
+                    interrumpido=self.isInterruptionRequested,
+                )
+                if self.isInterruptionRequested():
+                    break
+                self.resultado.emit(metodo, datos)
+            except InterruptedError:
+                break
+            except Exception as error:
+                self.error.emit(metodo, str(error))
+        self.progreso.emit("Comparacion terminada.")
+
+
+def _celda_html(valor):
+    return escape(str(valor))
+
+
+def _fila_html(nombre, valor):
+    return (
+        "<tr><td style='padding:5px 12px 5px 0'><b>" + _celda_html(nombre) +
+        "</b></td><td style='padding:5px'>" + _celda_html(valor) + "</td></tr>"
+    )
+
+
+def html_detalle_resultados(datos):
+    """Presenta metricas comunes y detalles por wave."""
+    partes = ["<div style='font-size:13px'>", "<table cellspacing='0'>"]
+    filas = [
+        ("Pedidos validos", datos["pedidos"]),
+        ("Pedidos rechazados al cargar", len(datos["rechazados"])),
+        ("Pickers disponibles", datos["pickers"]),
+        ("Waves generadas", datos["waves"]),
+        ("Unidades demandadas / agrupadas", f'{datos["unidades_pedidas"]} / {datos["unidades_waves"]}'),
+        ("Peso total de las waves", f'{datos["peso_waves"]:.2f} kg'),
+        ("Cobertura de la demanda", f'{datos["cobertura"]:.1f}%'),
+        ("Peso promedio por wave", f'{datos["promedio_peso_wave"]:.2f} kg'),
+        ("Tiempo de generacion de waves", f'{datos["tiempo_waves"]:.3f} s'),
+        ("Tiempo de ejecucion sin animacion", f'{datos["tiempo_sim"]:.3f} s'),
+        ("Ticks hasta finalizar", datos["ticks"]),
+        ("Asignaciones completadas", datos["asignaciones"]),
+        ("Distancia planeada total", f'{datos["distancia"]:.1f} pasos'),
+        ("Pasos efectivamente realizados", datos["pasos"]),
+        ("Esperas", datos["esperas"]),
+        ("Reenrutamientos", datos["reenrutamientos"]),
+        ("Pasos laterales", datos["pasos_laterales"]),
+    ]
+    if datos["metodo"] == "clustering":
+        filas.insert(0, (
+            "Clustering configurado", f'K solicitado={datos["k_pedido"]}; '
+            f'K efectivo={datos["k_efectivo"]}; '
+            f'metrica={"Topologica" if datos["metrica"] == "t" else "Euclidiana"}'
+        ))
+        filas.insert(1, (
+            "Productos por zona", ", ".join(str(x) for x in datos["zonas_productos"])
+        ))
+    partes += [_fila_html(nombre, valor) for nombre, valor in filas]
+    partes.append("</table>")
+
+    if datos["por_picker"]:
+        partes.append("<h3>Waves por picker</h3><ul>")
+        for picker_id, cantidad in sorted(datos["por_picker"].items()):
+            partes.append(f"<li>Picker {_celda_html(picker_id)}: {_celda_html(cantidad)} waves</li>")
+        partes.append("</ul>")
+
+    if datos["rechazados"] or datos["rechazos_waves"]:
+        partes.append("<h3>Pedidos rechazados / waves no asignadas</h3><ul>")
+        for rechazo in datos["rechazados"] + datos["rechazos_waves"]:
+            partes.append(f"<li>{_celda_html(rechazo)}</li>")
+        partes.append("</ul>")
+
+    partes.append("<h3>Detalle de waves (primeras 50)</h3>")
+    partes.append(
+        "<table cellspacing='0' cellpadding='5' border='1' "
+        "style='border-collapse:collapse'><tr><th>Wave</th><th>Unidades</th>"
+        "<th>Peso (kg)</th><th>Productos distintos</th></tr>"
+    )
+    for identificador, unidades, peso, productos in datos["detalles_waves"][:50]:
+        partes.append(
+            "<tr><td>" + _celda_html(identificador) + "</td><td>" +
+            _celda_html(unidades) + "</td><td>" + _celda_html(peso) +
+            "</td><td>" + _celda_html(productos) + "</td></tr>"
+        )
+    partes.append("</table>")
+    if datos["waves"] > 50:
+        partes.append(f"<p>Mostrando 50 de {datos['waves']} waves.</p>")
+    partes.append("</div>")
+    return "".join(partes)
+
+
+def html_tabla_comparativa(centroide, clustering):
+    """Contrasta solo metricas calculadas del mismo modo en ambas estrategias."""
+    formato = [
+        ("Waves", "waves", "{}"),
+        ("Unidades agrupadas", "unidades_waves", "{}"),
+        ("Cobertura (%)", "cobertura", "{:.1f}"),
+        ("Peso total (kg)", "peso_waves", "{:.1f}"),
+        ("Tiempo generacion (s)", "tiempo_waves", "{:.3f}"),
+        ("Tiempo simulacion (s)", "tiempo_sim", "{:.3f}"),
+        ("Ticks", "ticks", "{}"),
+        ("Asignaciones", "asignaciones", "{}"),
+        ("Distancia planeada", "distancia", "{:.1f}"),
+        ("Pasos realizados", "pasos", "{}"),
+        ("Esperas", "esperas", "{}"),
+        ("Reenrutamientos", "reenrutamientos", "{}"),
+        ("Pasos laterales", "pasos_laterales", "{}"),
+    ]
+    partes = [
+        "<h2>Comparacion final</h2>",
+        "<table cellspacing='0' cellpadding='8' border='1' style='border-collapse:collapse'>",
+        "<tr style='background-color:#e8eef8'><th>Metrica</th>"
+        "<th>Centroide</th><th>Clustering espectral</th></tr>",
+    ]
+    for titulo, clave, fmt in formato:
+        partes.append(
+            "<tr><td>" + _celda_html(titulo) + "</td><td align='right'>" +
+            _celda_html(fmt.format(centroide[clave])) + "</td><td align='right'>" +
+            _celda_html(fmt.format(clustering[clave])) + "</td></tr>"
+        )
+    partes.append("</table>")
+    partes.append(
+        "<p><i>Ambos calculos parten de dos warehouses creados por separado "
+        "desde el mismo JSON; algoritmo de recorrido BFS. "
+        "La cantidad de waves por si sola no indica que una estrategia sea mejor. "
+        "Los tiempos pueden variar segun el equipo y la carga del sistema.</i></p>"
+    )
+    return "".join(partes)
+
+
+class VentanaResultados(QWidget):
+    """Muestra centroide, clustering debajo y una tabla final de comparacion."""
+
+    def __init__(self, opciones):
+        super().__init__()
+        self.setWindowTitle("Resultados - Centroide vs Clustering espectral")
+        self.resize(1050, 820)
+        self.datos = {}
+        layout = QVBoxLayout(self)
+        encabezado = QLabel("COMPARACION DE RESULTADOS")
+        encabezado.setStyleSheet("font-size:20px; font-weight:bold")
+        layout.addWidget(encabezado)
+        descripcion = QLabel(
+            f"Escenario: {opciones['json']}\n"
+            f"K elegido: {opciones['k']} | "
+            f"Metrica: {'Topologica' if opciones['metrica'] == 't' else 'Euclidiana'} | "
+            "Recorrido: BFS"
+        )
+        descripcion.setWordWrap(True)
+        layout.addWidget(descripcion)
+        self.estado = QLabel("Preparando comparacion...")
+        layout.addWidget(self.estado)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        contenido = QWidget()
+        columnas = QVBoxLayout(contenido)
+        columnas.setSpacing(14)
+
+        columnas.addWidget(QLabel("1. RESULTADOS DEL CENTROIDE"))
+        self.centroide = QTextBrowser()
+        self.centroide.setMinimumHeight(330)
+        self.centroide.setHtml("<i>Calculando resultados del centroide...</i>")
+        columnas.addWidget(self.centroide)
+
+        columnas.addWidget(QLabel("2. RESULTADOS DEL CLUSTERING ESPECTRAL"))
+        self.clustering = QTextBrowser()
+        self.clustering.setMinimumHeight(330)
+        self.clustering.setHtml("<i>Se iniciara al terminar el centroide...</i>")
+        columnas.addWidget(self.clustering)
+
+        self.comparacion = QTextBrowser()
+        self.comparacion.setMinimumHeight(430)
+        self.comparacion.setHtml("<i>La tabla comparativa aparecera al finalizar ambos metodos.</i>")
+        columnas.addWidget(self.comparacion)
+        scroll.setWidget(contenido)
+        layout.addWidget(scroll)
+
+        fila = QHBoxLayout()
+        self.cancelar = QPushButton("Cancelar calculo")
+        self.cancelar.clicked.connect(self.cancelar_calculo)
+        fila.addWidget(self.cancelar)
+        fila.addStretch()
+        cerrar = QPushButton("Cerrar")
+        cerrar.clicked.connect(self.close)
+        fila.addWidget(cerrar)
+        layout.addLayout(fila)
+
+        self.worker = TrabajadorResultados(opciones, self)
+        self.worker.progreso.connect(self.estado.setText)
+        self.worker.resultado.connect(self.mostrar_resultado)
+        self.worker.error.connect(self.mostrar_error)
+        self.worker.finished.connect(self.calculo_finalizado)
+        self.worker.start()
+
+    def mostrar_resultado(self, metodo, datos):
+        self.datos[metodo] = datos
+        panel = self.centroide if metodo == "centroide" else self.clustering
+        panel.setHtml(html_detalle_resultados(datos))
+        if "centroide" in self.datos and "clustering" in self.datos:
+            self.comparacion.setHtml(
+                html_tabla_comparativa(
+                    self.datos["centroide"], self.datos["clustering"]
+                )
+            )
+
+    def mostrar_error(self, metodo, mensaje):
+        panel = self.centroide if metodo == "centroide" else self.clustering
+        panel.setHtml(
+            "<h3>No se pudo completar este metodo</h3><p>" +
+            _celda_html(mensaje) + "</p>"
+        )
+        self.estado.setText(f"Error en {metodo}: {mensaje}")
+        self.comparacion.setHtml(
+            "<p>No se puede construir una comparacion completa si alguno "
+            "de los metodos falla. Revisa los mensajes de error.</p>"
+        )
+
+    def cancelar_calculo(self):
+        if self.worker.isRunning():
+            self.worker.requestInterruption()
+            self.estado.setText("Cancelacion solicitada; finalizara al terminar la tarea actual.")
+            self.cancelar.setEnabled(False)
+
+    def calculo_finalizado(self):
+        self.cancelar.setEnabled(False)
+        if self.worker.isInterruptionRequested():
+            self.estado.setText("Comparacion cancelada.")
+        elif len(self.datos) == 2:
+            self.estado.setText("Comparacion finalizada. Ambos metodos completados.")
+        else:
+            self.estado.setText("Comparacion finalizada con errores; consulta cada seccion.")
+
+    def closeEvent(self, event):
+        if self.worker.isRunning():
+            self.cancelar_calculo()
+            QMessageBox.information(
+                self, "Calculo en curso",
+                "Se solicito detener el calculo. Cierra la ventana cuando termine."
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 
 def iniciar():
@@ -1225,7 +1745,12 @@ def iniciar():
     dialogo = DialogoEstrategia()
 
     while True:
-        if dialogo.exec() != QDialog.DialogCode.Accepted:
+        eleccion = dialogo.exec()
+        if eleccion == 2:
+            ventana = VentanaResultados(dialogo.opciones_resultados)
+            ventana.showMaximized()
+            return app.exec()
+        if eleccion != QDialog.DialogCode.Accepted:
             return 0
 
         try:

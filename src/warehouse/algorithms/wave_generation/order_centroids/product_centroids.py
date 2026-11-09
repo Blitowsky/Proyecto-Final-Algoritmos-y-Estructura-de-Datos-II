@@ -1,3 +1,4 @@
+
 import math
 
 from warehouse.domain.warehouse import WareHouse

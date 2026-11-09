@@ -13,7 +13,7 @@ from warehouse.visualization.ascii_map import render_map, render_rows
 from warehouse.algorithms.generacioWave import generacionWaves, generacionWavesPruebas
 from warehouse.persistence.save_load import load, save
 
-SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande.json")
+SCENARIO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "escenario_grande_mod.json")
 
 config = load_config(SCENARIO)
 warehouse = build_warehouse(config)
