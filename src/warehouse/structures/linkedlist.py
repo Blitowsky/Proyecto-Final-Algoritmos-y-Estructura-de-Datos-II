@@ -21,6 +21,12 @@ class LinkedList:
             add(self, valor)
 
 
+    def __iter__(self):
+        current = self.head
+        while current is not None:
+            yield current.value
+            current = current.nextNode
+
     def print_list(self):
         current = self.head
         while current is not None:

@@ -1,3 +1,16 @@
+"""
+Order: un pedido con uno o más productos, cada uno
+con una cantidad requerida, más prioridad y estado.
+
+DISEÑO
+----------
+El pedido valida sus propias líneas (cantidad, stock y duplicados).
+
+Los totales (unidades, peso y número de líneas) se mantienen actualizados 
+a medida que se agregan líneas, por lo que la generación de oleadas puede
+consultarlos en O(1), sin tener que recorrer las líneas nuevamente.
+"""
+
 from warehouse.structures.linkedlist import LinkedList, add
 
 from warehouse.domain.product import Product
@@ -6,10 +19,19 @@ class OrderLine:
     def __init__(self, product: Product, qty: int) -> None:
         self.product: Product = product
         self.qty: int = qty
+        self.usado: int = 0
 
     @property
     def weight(self) -> float:
         return self.product.weight * self.qty
+
+    @property
+    def weightRestante(self) -> float:
+        return self.product.weight * (self.qty - self.usado)
+
+    @property
+    def resto(self) -> int:
+        return self.qty - self.usado
 
 class Order:
     def __init__(self, order_id: str, priority: int) -> None:
@@ -26,6 +48,7 @@ class Order:
         self.total_weight: float = 0.0
         self.state: str = "PENDIENTE"
         self.wave = None
+        self.peso_restante: float = 0.0
 
     def add_line(self, product: Product, qty: int) -> None:
         if self.state != "PENDIENTE":
@@ -46,9 +69,16 @@ class Order:
         self.line_count += 1
         self.total_units += qty
         self.total_weight += line.weight
+        self.peso_restante += line.weight
         
     def _move(self, expected: str, new: str) -> None:
-        if self.state != expected:
+        if self.state == "PREPARADO":
+            self.state = new
+        elif self.state == "EN_PREPARACION":
+            self.state = new
+        elif self.state == "EN_WAVE":
+            self.state = new
+        elif self.state != expected:
             raise ValueError(f"El pedido {self.id} está {self.state}, debe ser {expected} antes de poder ser {new}.")
         self.state = new
 

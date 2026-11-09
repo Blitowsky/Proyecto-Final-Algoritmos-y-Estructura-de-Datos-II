@@ -1,5 +1,5 @@
 from warehouse.structures.linkedlist import LinkedList, add, length
-from warehouse.structures.dictionary import Dictionary, search, insert
+from warehouse.structures.dictionary import CloseDictionary, search, insert
 from warehouse.structures.graph import WeightedDirectedGraph
 
 from warehouse.domain.warehouse import Floor, WareHouse
@@ -15,6 +15,7 @@ from warehouse.domain.direction import MOVES, step
 from warehouse.services.hall_graph_builder import build_hall_graph
 from warehouse.services.rack_cell_builder import build_rack_cells
 from warehouse.services.order_service import add_orders
+from warehouse.services.order_validation import validate_orders_stock
 from warehouse.services.product_loader import load_products
 
 from warehouse.persistence.scenario_loader import (
@@ -54,6 +55,8 @@ def build_floor(config: dict) -> Floor:
     return floor
 
 def build_warehouse(config: dict) -> WareHouse:
+    """Constructor del `WareHouse` basado en el JSON,
+    o `ValueError` si falta algo/hay algún error."""
     floor = build_floor(config)
     graph = build_hall_graph(floor)
     build_rack_cells(floor)
@@ -61,10 +64,11 @@ def build_warehouse(config: dict) -> WareHouse:
 
     products = load_products(config, floor)
     pickers = load_pickers(config, floor)
-    orders, orders_by_id = add_orders(config, products)
+    rejected_on_load = []
+    orders, orders_by_id = add_orders(config, products, rejected=rejected_on_load)
     wave_config = add_wave_config(config)
 
-    return WareHouse(
+    warehouse = WareHouse(
         floor,
         graph,
         products,
@@ -73,9 +77,12 @@ def build_warehouse(config: dict) -> WareHouse:
         orders_by_id,
         wave_config
     )
+    warehouse.rejected_orders = rejected_on_load
+    validate_orders_stock(warehouse)
+    return warehouse
 
 
-def add_unique(items: LinkedList, by_id: Dictionary, item, label: str) -> None:
+def add_unique(items: LinkedList, by_id: CloseDictionary, item, label: str) -> None:
     if search(by_id, item.id) is not None:
         raise ValueError(f"{label} aparece dos veces.")
     insert(by_id, item, item.id)
@@ -159,7 +166,7 @@ def check_every_door_has_a_zone(floor: Floor) -> None:
 
 def check_picker_starts(config: dict, floor: Floor) -> None:
     pickers_raw = config.get("pickers", [])
-    seen = Dictionary(2 * len(pickers_raw) + 1)
+    seen = CloseDictionary(2 * len(pickers_raw) + 1)
 
     for i in range(len(pickers_raw)):
         p = pickers_raw[i]
@@ -180,6 +187,7 @@ def check_picker_starts(config: dict, floor: Floor) -> None:
             raise ValueError(f"{label} debe empezar en un pasillo, pero ({x}, {y}) es {cell.label()}.")
 
 def load_pickers(config: dict, floor: Floor) -> LinkedList:
+    """`LinkedList` de `Picker` según el JSON."""
     check_picker_starts(config, floor)
 
     pickers = LinkedList()
@@ -191,6 +199,8 @@ def load_pickers(config: dict, floor: Floor) -> LinkedList:
     return pickers
 
 def add_wave_config(config: dict) -> WaveConfig|None:
+    """Lee 'configuracion'. Retorna `WaveConfig`, o `None`
+    si falta esa sección en el JSON."""
     if "configuracion" not in config:
         return None
     wc = config["configuracion"]
@@ -198,6 +208,14 @@ def add_wave_config(config: dict) -> WaveConfig|None:
     return WaveConfig(wc["wave_max_pedidos"], wc["wave_max_productos"])
 
 def build_dropoff_cells(floor) -> None:
+    """Llena zone.access (`LinkedList` de IDs de pasillos) para cada zona de 
+    despacho, y floor.dropoff (ID pasillo) -> (`LinkedList` zonas que toca).
+
+    Parámetros
+    ----------
+        floor (`Floor`):
+            Plan de piso del warehouse.
+    """
     z = floor.zones.head
     while z is not None:
         if z.value is None:

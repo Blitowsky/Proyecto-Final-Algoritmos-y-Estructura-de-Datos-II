@@ -1,0 +1,261 @@
+{
+  "warehouse": {
+    "dimensiones": {
+      "ancho_x": 14,
+      "largo_y": 14
+    },
+    "puertas": [
+      {
+        "id": "PUERTA_OUT_1",
+        "tipo": "OUTBOUND",
+        "ubicacion": {
+          "x": 4,
+          "y": 0
+        }
+      },
+      {
+        "id": "PUERTA_IN_1",
+        "tipo": "INBOUND",
+        "ubicacion": {
+          "x": 10,
+          "y": 0
+        }
+      }
+    ],
+    "zonas_despacho": [
+      {
+        "id": "ZONA_A",
+        "ubicacion": {
+          "x": 2,
+          "y": 1
+        },
+        "ancho": 5,
+        "alto": 2,
+        "puerta_id": "PUERTA_OUT_1",
+        "peso_max_kg": 800.0
+      },
+      {
+        "id": "ZONA_B",
+        "ubicacion": {
+          "x": 7,
+          "y": 1
+        },
+        "ancho": 5,
+        "alto": 2,
+        "puerta_id": "PUERTA_IN_1",
+        "peso_max_kg": 800.0
+      }
+    ],
+    "racks": [
+      {
+        "id": "R001",
+        "ubicacion": {
+          "x": 3,
+          "y": 6
+        },
+        "ancho": 2,
+        "alto": 5
+      },
+      {
+        "id": "R002",
+        "ubicacion": {
+          "x": 8,
+          "y": 6
+        },
+        "ancho": 2,
+        "alto": 5
+      }
+    ],
+    "pasillos": [
+      {
+        "id": "PAS_001",
+        "ubicacion": {
+          "x": 0,
+          "y": 6
+        },
+        "ancho": 3,
+        "alto": 5,
+        "sentido": "N"
+      },
+      {
+        "id": "PAS_002",
+        "ubicacion": {
+          "x": 5,
+          "y": 6
+        },
+        "ancho": 3,
+        "alto": 5,
+        "sentido": "S"
+      },
+      {
+        "id": "PAS_003",
+        "ubicacion": {
+          "x": 10,
+          "y": 6
+        },
+        "ancho": 3,
+        "alto": 5,
+        "sentido": "N"
+      },
+      {
+        "id": "PAS_005",
+        "ubicacion": {
+          "x": 0,
+          "y": 3
+        },
+        "ancho": 14,
+        "alto": 3,
+        "sentido": "AMBOS"
+      },
+      {
+        "id": "PAS_006",
+        "ubicacion": {
+          "x": 0,
+          "y": 11
+        },
+        "ancho": 14,
+        "alto": 3,
+        "sentido": "AMBOS"
+      }
+    ]
+  },
+  "pickers": [
+    {
+      "id": "PK_01",
+      "posicion_inicial": {
+        "x": 1,
+        "y": 4
+      },
+      "capacidad_carga_kg": 150.0
+    }
+  ],
+  "productos": [
+    {
+      "id": "P001",
+      "nombre": "Monitor 27",
+      "rack_id": "R001",
+      "ubicacion": {
+        "x": 3,
+        "y": 6,
+        "z": 1
+      },
+      "cantidad_disponible": 29,
+      "peso_kg": 6.5
+    },
+    {
+      "id": "P002",
+      "nombre": "Teclado Mecánico",
+      "rack_id": "R002",
+      "ubicacion": {
+        "x": 8,
+        "y": 6,
+        "z": 1
+      },
+      "cantidad_disponible": 18,
+      "peso_kg": 1.2
+    },
+    {
+      "id": "P003",
+      "nombre": "Mouse Inalámbrico",
+      "rack_id": "R001",
+      "ubicacion": {
+        "x": 4,
+        "y": 6,
+        "z": 1
+      },
+      "cantidad_disponible": 50,
+      "peso_kg": 0.3
+    },
+    {
+      "id": "P004",
+      "nombre": "Notebook 14",
+      "rack_id": "R002",
+      "ubicacion": {
+        "x": 9,
+        "y": 6,
+        "z": 1
+      },
+      "cantidad_disponible": 46,
+      "peso_kg": 2.1
+    },
+    {
+      "id": "P005",
+      "nombre": "Auriculares",
+      "rack_id": "R001",
+      "ubicacion": {
+        "x": 3,
+        "y": 7,
+        "z": 1
+      },
+      "cantidad_disponible": 43,
+      "peso_kg": 0.4
+    },
+    {
+      "id": "P006",
+      "nombre": "Impresora Láser",
+      "rack_id": "R002",
+      "ubicacion": {
+        "x": 8,
+        "y": 7,
+        "z": 1
+      },
+      "cantidad_disponible": 32,
+      "peso_kg": 9.8
+    }
+  ],
+  "pedidos": [
+    {
+      "id": "PED_001",
+      "prioridad": 5,
+      "estado": "PENDIENTE",
+      "items": [
+        {
+          "producto_id": "P006",
+          "cantidad": 1
+        }
+      ]
+    },
+    {
+      "id": "PED_002",
+      "prioridad": 2,
+      "estado": "PENDIENTE",
+      "items": [
+        {
+          "producto_id": "P001",
+          "cantidad": 3
+        },
+        {
+          "producto_id": "P006",
+          "cantidad": 3
+        },
+        {
+          "producto_id": "P005",
+          "cantidad": 1
+        },
+        {
+          "producto_id": "P004",
+          "cantidad": 3
+        }
+      ]
+    },
+    {
+      "id": "PED_003",
+      "prioridad": 4,
+      "estado": "PENDIENTE",
+      "items": [
+        {
+          "producto_id": "P006",
+          "cantidad": 1
+        },
+        {
+          "producto_id": "P005",
+          "cantidad": 2
+        }
+      ]
+    }
+  ],
+  "configuracion": {
+    "wave_max_pedidos": 2,
+    "wave_max_productos": 5
+  }
+}

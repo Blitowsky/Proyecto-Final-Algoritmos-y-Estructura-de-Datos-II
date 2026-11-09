@@ -1,3 +1,13 @@
+"""
+Lee el formato JSON, sección `"warehouse"` y convierte
+cada `ENTRY` en un objeto de dominio, generando errores
+cuando faltan campos o estos tienen tipos incorrectos. 
+
+La validación de la geometría (límites, superposiciones,
+puertas en el borde, etc.) se realiza posteriormente en
+`services/floor_builder.py`.
+"""
+
 import json
 
 from warehouse.domain.rect import Rect
@@ -8,6 +18,7 @@ from warehouse.domain.location import HallSection
 from warehouse.domain.direction import is_sentido, SENTIDOS
 
 def require_keys(section: dict, keys: tuple, label: str) -> None:
+    """Error legible en lugar de `KeyError` si falta alguna key."""
     for key in keys:
         if key not in section:
             raise ValueError(f"{label} no tiene '{key}'.")
@@ -54,6 +65,8 @@ def read_point(section: dict, label: str) -> tuple[int, int]:
     return require_int(section["x"], label + ".x"), require_int(section["y"], label + ".y")
 
 def read_rect(entry: dict, label: str) -> Rect:
+    """Retorna un rectángulo `Rect` por cada 
+    entrada con `ubicación, `ancho` y `alto`."""
     require_keys(entry, ("ubicacion", "ancho", "alto"), label)
     x, y = read_point(entry["ubicacion"], label + " ubicacion")
     width = require_positive_int(entry["ancho"], f"El ancho de {label}")
