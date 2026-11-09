@@ -85,6 +85,14 @@ PYTHONPATH=src python src/ui/interfaz.py
 
 El sistema permite guardar y recuperar el estado de un depósito mediante serialización con `pickle`.
 
+## Documentacion
+
+Se genera automaticamente al ejectura: 
+
+```bash
+PYTHONPATH=src pdoc src/
+```
+
 ## Autores
 - Matias Cuneo
 - Pablo Morata
