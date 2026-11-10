@@ -1,3 +1,8 @@
+
+
+# Proyecto finalizado, entregado y expuesto con éxito. Nota obtenida: 9 (nueve)
+
+
 # Simulación de Warehouse
 
 ## Descripción
